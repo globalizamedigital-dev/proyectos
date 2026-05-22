@@ -243,9 +243,25 @@ def fill_template(template: str, variables: dict) -> str:
     return result
 
 
-def prepare_email(lead: dict, template_name: str = "email_cold_es.txt") -> Optional[dict]:
+def _unsubscribe_mailto(from_email: str) -> str:
+    """Devuelve la URL mailto: de baja para un remitente dado (RFC 8058)."""
+    addr = from_email or ""
+    return f"mailto:{addr}?subject=BAJA" if addr else "mailto:?subject=BAJA"
+
+
+def prepare_email(
+    lead: dict,
+    template_name: str = "email_cold_es.txt",
+    from_email: Optional[str] = None,
+) -> Optional[dict]:
     """
     Prepara un email personalizado para un lead.
+
+    Args:
+        lead: diccionario del lead.
+        template_name: nombre de la plantilla.
+        from_email: remitente, usado para construir el enlace de baja
+                    ({enlace_baja} en las plantillas).
 
     Returns:
         dict con keys: to, subject, body, template_name
@@ -301,6 +317,8 @@ def prepare_email(lead: dict, template_name: str = "email_cold_es.txt") -> Optio
         "nif": lead.get("nif", ""),
         "score": str(lead.get("score", {}).get("score", "")) if isinstance(lead.get("score"), dict) else "",
         "fecha": datetime.now().strftime("%d/%m/%Y"),
+        # Enlace de baja (opt-out) — RFC: mailto con asunto BAJA
+        "enlace_baja": _unsubscribe_mailto(from_email or ""),
     }
 
     body = fill_template(template, variables)
@@ -346,6 +364,17 @@ def send_email(to: str, subject: str, body: str, config: dict) -> bool:
     """
     Envía un email via SMTP.
 
+    Cumplimiento legal: ANTES de enviar comprueba la lista de supresión. Si el
+    destinatario (o su dominio) está suprimido, NO se envía (se registra como
+    status="suppressed" y se devuelve False).
+
+    Cada email lleva cabeceras List-Unsubscribe / List-Unsubscribe-Post
+    (RFC 2369 / RFC 8058) con un mailto: de baja.
+
+    Manejo de rebotes: ante SMTPRecipientsRefused o un código 5xx el email se
+    registra como status="bounced" y se añade automáticamente a la lista de
+    supresión (reason="hard-bounce").
+
     Args:
         to: Email destinatario
         subject: Asunto
@@ -362,7 +391,7 @@ def send_email(to: str, subject: str, body: str, config: dict) -> bool:
         }
 
     Returns:
-        bool: True si se envió correctamente
+        bool: True si se envió correctamente. False si estaba suprimido.
     """
     smtp_host = config.get("smtp_host", "smtp.gmail.com")
     smtp_port = config.get("smtp_port", 587)
@@ -376,6 +405,14 @@ def send_email(to: str, subject: str, body: str, config: dict) -> bool:
     if not smtp_user or not smtp_password:
         raise ValueError("Se requiere smtp_user y smtp_password en la configuración")
 
+    # --- Cumplimiento legal: comprobar lista de supresión ANTES de enviar ---
+    if suppression.is_suppressed(email=to):
+        _log.warning("Envío bloqueado: %s está en la lista de supresión", to)
+        log_outreach(to_email=to, channel="email", status="suppressed",
+                     subject=subject, error="destinatario en lista de supresión")
+        emit_observation("outreach", {"action": "email_suppressed", "to": to})
+        return False
+
     # Crear mensaje MIME
     msg = MIMEMultipart("alternative")
     msg["From"] = f"{from_name} <{from_email}>"
@@ -383,12 +420,18 @@ def send_email(to: str, subject: str, body: str, config: dict) -> bool:
     msg["Subject"] = subject
     msg["Reply-To"] = from_email
 
+    # Cabeceras de baja (RFC 2369 / RFC 8058) — obligatorias para entregabilidad
+    unsub = _unsubscribe_mailto(from_email)
+    msg["List-Unsubscribe"] = f"<{unsub}>"
+    msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+
     # Añadir texto plano y HTML si aplica
     if "<html>" in body.lower():
         msg.attach(MIMEText(body, "html", "utf-8"))
     else:
         msg.attach(MIMEText(body, "plain", "utf-8"))
 
+    server = None
     try:
         if use_ssl:
             server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
@@ -405,9 +448,36 @@ def send_email(to: str, subject: str, body: str, config: dict) -> bool:
         return True
 
     except smtplib.SMTPAuthenticationError as e:
+        _safe_quit(server)
         raise ValueError(f"Error de autenticación SMTP: {e}")
+    except smtplib.SMTPRecipientsRefused as e:
+        # Destinatario rechazado — hard bounce
+        _safe_quit(server)
+        mark_bounced(to)
+        raise RuntimeError(f"Destinatario rechazado (hard bounce): {e}")
+    except smtplib.SMTPSenderRefused as e:
+        _safe_quit(server)
+        raise RuntimeError(f"Remitente rechazado por el servidor SMTP: {e}")
+    except smtplib.SMTPDataError as e:
+        # Errores 5xx en la fase DATA suelen indicar rechazo permanente
+        _safe_quit(server)
+        code = getattr(e, "smtp_code", 0)
+        if isinstance(code, int) and 500 <= code < 600:
+            mark_bounced(to)
+            raise RuntimeError(f"Rechazo permanente 5xx (hard bounce): {e}")
+        raise RuntimeError(f"Error SMTP en DATA: {e}")
     except smtplib.SMTPException as e:
+        _safe_quit(server)
         raise RuntimeError(f"Error SMTP al enviar: {e}")
+
+
+def _safe_quit(server) -> None:
+    """Cierra una conexión SMTP ignorando cualquier error."""
+    if server is not None:
+        try:
+            server.quit()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def generate_linkedin_message(lead: dict) -> str:
@@ -503,9 +573,16 @@ def send_outreach_batch(
     dry_run: bool = True,
     skip_already_contacted: bool = True,
     days_since_last_contact: int = 30,
+    min_seconds_between_sends: int = DEFAULT_MIN_SECONDS_BETWEEN_SENDS,
+    daily_cap: int = DEFAULT_DAILY_CAP,
 ) -> dict:
     """
-    Envía outreach a un lote de leads.
+    Envía outreach a un lote de leads, respetando:
+      - Lista de supresión (cumplimiento legal): los destinatarios suprimidos
+        se cuentan aparte como `suppressed` y NUNCA reciben email.
+      - Throttle de envío: espera `min_seconds_between_sends` entre envíos reales.
+      - Cap diario: si se alcanza `daily_cap` envíos hoy, se detiene y devuelve
+        `daily_cap_reached: True`.
 
     Args:
         leads: Lista de leads con emails
@@ -514,22 +591,60 @@ def send_outreach_batch(
         dry_run: Si True, solo simula sin enviar
         skip_already_contacted: Omitir leads ya contactados
         days_since_last_contact: Días mínimos entre contactos
+        min_seconds_between_sends: segundos de espera entre envíos reales
+        daily_cap: número máximo de envíos reales en el día
 
     Returns:
-        dict con stats: {sent, skipped, errors, previews}
+        dict con stats: {sent, skipped, suppressed, errors, previews,
+                         daily_cap_reached, bounced}
     """
     sent = 0
     skipped = 0
-    errors = []
-    previews = []
+    suppressed = 0
+    bounced = 0
+    errors: list[dict] = []
+    previews: list[dict] = []
+    daily_cap_reached = False
+
+    from_email = smtp_config.get("from_email") or smtp_config.get("smtp_user", "")
+
+    # Envíos ya realizados hoy — punto de partida para el cap diario
+    already_sent_today = get_sent_today_count() if not dry_run else 0
+    remaining_today = max(0, daily_cap - already_sent_today)
+    if not dry_run and remaining_today <= 0:
+        return {
+            "dry_run": dry_run,
+            "sent": 0,
+            "skipped": 0,
+            "suppressed": 0,
+            "bounced": 0,
+            "errors": [],
+            "previews": [],
+            "total": len(leads),
+            "daily_cap_reached": True,
+            "sent_today_before": already_sent_today,
+        }
+
+    last_real_send: Optional[float] = None
 
     for lead in leads:
-        prepared = prepare_email(lead, template_name)
+        prepared = prepare_email(lead, template_name, from_email=from_email)
         if not prepared:
             skipped += 1
             continue
 
         to_email = prepared["to"]
+
+        # --- Cumplimiento legal: comprobar lista de supresión ---
+        if suppression.is_suppressed(email=to_email, nif=lead.get("nif")):
+            suppressed += 1
+            log_outreach(
+                to_email=to_email, channel="email", status="suppressed",
+                lead=lead, subject=prepared["subject"],
+                template_name=template_name,
+                error="destinatario en lista de supresión",
+            )
+            continue
 
         # Comprobar si ya fue contactado recientemente
         if skip_already_contacted and has_been_contacted(to_email, days=days_since_last_contact):
@@ -546,6 +661,18 @@ def send_outreach_batch(
             sent += 1
             continue
 
+        # --- Cap diario ---
+        if (already_sent_today + sent) >= daily_cap:
+            daily_cap_reached = True
+            break
+
+        # --- Throttle entre envíos reales ---
+        if last_real_send is not None and min_seconds_between_sends > 0:
+            elapsed = time.monotonic() - last_real_send
+            wait_for = min_seconds_between_sends - elapsed
+            if wait_for > 0:
+                time.sleep(wait_for)
+
         try:
             success = send_email(
                 to=to_email,
@@ -553,6 +680,7 @@ def send_outreach_batch(
                 body=prepared["body"],
                 config=smtp_config,
             )
+            last_real_send = time.monotonic()
             if success:
                 log_outreach(
                     to_email=to_email,
@@ -564,26 +692,36 @@ def send_outreach_batch(
                     message_preview=prepared["body"][:500],
                 )
                 sent += 1
+            else:
+                # send_email devolvió False -> estaba suprimido
+                suppressed += 1
         except Exception as e:
             error_msg = str(e)
             errors.append({"to": to_email, "error": error_msg})
-            log_outreach(
-                to_email=to_email,
-                channel="email",
-                status="error",
-                lead=lead,
-                subject=prepared["subject"],
-                template_name=template_name,
-                error=error_msg,
-            )
+            if "bounce" in error_msg.lower():
+                bounced += 1
+            else:
+                log_outreach(
+                    to_email=to_email,
+                    channel="email",
+                    status="error",
+                    lead=lead,
+                    subject=prepared["subject"],
+                    template_name=template_name,
+                    error=error_msg,
+                )
 
     return {
         "dry_run": dry_run,
         "sent": sent,
         "skipped": skipped,
+        "suppressed": suppressed,
+        "bounced": bounced,
         "errors": errors,
         "previews": previews[:5],
         "total": len(leads),
+        "daily_cap_reached": daily_cap_reached,
+        "sent_today_before": already_sent_today,
     }
 
 

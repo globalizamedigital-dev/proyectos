@@ -35,6 +35,7 @@ import infosubvenciones
 import osm
 import placsp
 import cartociudad
+import leads_db
 
 
 def _get_person_and_email(razon_social: str, domain_info: dict, borme_raw: list, city: str) -> dict:
@@ -234,6 +235,16 @@ def discover(geo: str, sector: str, max_results: int = 50, enrich: bool = True) 
     payload["totalCandidates"] = len(enriched)
     payload["totalUnresolvedDomain"] = unresolved_domain
     payload["sourcesAvailability"] = SourceStatus.snapshot()
+
+    # --- Persistir en el datastore de leads (dedup entre ejecuciones) ---
+    persisted = 0
+    for lead in enriched:
+        try:
+            if leads_db.upsert_lead(lead):
+                persisted += 1
+        except Exception as e:  # noqa: BLE001
+            emit_observation("leads_db_error", {"phase": "discover", "error": str(e)})
+    payload["leadsPersisted"] = persisted
 
     # --- Fase 4: persistir ---
     snapshot_path = write_snapshot("discover", payload)

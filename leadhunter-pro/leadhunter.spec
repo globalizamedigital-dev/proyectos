@@ -1,11 +1,19 @@
 # leadhunter.spec — PyInstaller spec para generar ejecutable Windows .exe
 #
-# Uso:
+# Build (modo carpeta, recomendado — arranque más rápido):
 #   pip install pyinstaller
 #   pyinstaller leadhunter.spec
+#   -> El ejecutable se genera en dist/LeadHunterPro/LeadHunterPro.exe
 #
-# El ejecutable se genera en dist/LeadHunterPro/LeadHunterPro.exe
-# Para un solo archivo: cambiar onefile=True (más lento al iniciar)
+# Build (modo onefile, un único .exe — arranque más lento):
+#   pyinstaller --onefile --name LeadHunterPro --noconsole \
+#     --add-data "mappings:mappings" --add-data "templates:templates" \
+#     --add-data "docs:docs" --add-data "scripts:scripts" \
+#     --add-data "gui:gui" main.py
+#   (En Windows, el separador de --add-data es ';' en lugar de ':')
+#
+# También puede activarse el modo onefile descomentando el bloque
+# exe_onefile al final de este archivo y comentando el bloque COLLECT.
 
 import sys
 from pathlib import Path
@@ -18,9 +26,10 @@ a = Analysis(
     pathex=[str(ROOT), str(ROOT / 'scripts'), str(ROOT / 'gui')],
     binaries=[],
     datas=[
-        # Incluir mappings, templates y scripts en el bundle
+        # Incluir mappings, templates, docs y scripts en el bundle
         (str(ROOT / 'mappings'), 'mappings'),
         (str(ROOT / 'templates'), 'templates'),
+        (str(ROOT / 'docs'), 'docs'),
         (str(ROOT / 'scripts'), 'scripts'),
         (str(ROOT / 'gui'), 'gui'),
     ],
@@ -35,15 +44,20 @@ a = Analysis(
         'smtplib',
         'email.mime.multipart',
         'email.mime.text',
+        'logging.handlers',
         'urllib.robotparser',
         'xml.etree.ElementTree',
         'unicodedata',
         'hashlib',
+        'csv',
         'queue',
         'threading',
         'concurrent.futures',
         # Scripts propios
         '_common',
+        'config',
+        'suppression',
+        'leads_db',
         'borme',
         'ddg',
         'domain_resolver',

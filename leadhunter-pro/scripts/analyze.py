@@ -33,6 +33,7 @@ import cartociudad
 import domain_resolver
 import infosubvenciones
 import placsp
+import leads_db
 
 
 def analyze(input_str: str, premium: bool = False) -> dict:
@@ -277,6 +278,26 @@ def analyze(input_str: str, premium: bool = False) -> dict:
         "reason": "; ".join(reason_parts) if reason_parts else "Datos insuficientes",
         "nextStep": _recommend_next_step(payload),
     }
+
+    # --- Persistir en el datastore de leads (dedup entre ejecuciones) ---
+    try:
+        lead_for_db = {
+            "razonSocial": razon_social,
+            "nif": nif,
+            "domain": {"resolved": resolved_domain} if resolved_domain else None,
+            "emails": payload["emails"],
+            "phones": payload["phones"],
+            "decisionMakers": payload["decisionMakers"],
+            "geocoded": payload.get("geocoded"),
+            "sector": (payload.get("infoempresa") or {}).get("sector"),
+            "score": payload.get("score"),
+            "compliance": payload.get("compliance"),
+            "sourcesHit": ["analyze"],
+        }
+        if lead_for_db.get("nif") or lead_for_db.get("razonSocial"):
+            payload["leadDbId"] = leads_db.upsert_lead(lead_for_db)
+    except Exception as e:  # noqa: BLE001
+        emit_observation("leads_db_error", {"phase": "analyze", "error": str(e)})
 
     # --- Persistir ---
     snapshot_path = write_snapshot("analyze", payload)

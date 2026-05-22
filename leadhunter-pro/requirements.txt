@@ -1,26 +1,44 @@
 # LeadHunter Pro — Dependencias
+# ==============================================================================
 #
-# NÚCLEO: Solo stdlib Python 3.11+ — no se requiere instalar nada para la
-# funcionalidad principal (scraping, SMTP verify, GUI Tkinter, SQLite, CSV).
+# NÚCLEO (obligatorias): NINGUNA.
+#   Toda la funcionalidad principal usa solo la biblioteca estándar de
+#   Python 3.11+ : scraping con urllib, verificación SMTP con smtplib, GUI con
+#   tkinter, base de datos con sqlite3, exportación con csv, logging, etc.
+#   La aplicación funciona sin instalar nada.
 #
-# OPCIONALES: Mejoran funcionalidad si están disponibles (degradación elegante si no).
+# OPCIONALES: mejoran la funcionalidad si están presentes. La aplicación
+#   degrada de forma elegante (fallback) cuando no están instaladas.
+#
+# DESARROLLO / BUILD: necesarias solo para ejecutar tests o generar el .exe.
+#
+# Instalación de las opcionales:   pip install -r requirements.txt
+# ==============================================================================
 
-# DNS para verificación SMTP más robusta (fallback a socket si no está)
+# --- OPCIONALES ---------------------------------------------------------------
+
+# DNS para verificación SMTP más robusta (fallback a socket si no está).
 dnspython>=2.4.0
 
-# Excel export (si se quiere exportar a .xlsx además de CSV)
+# Exportación a Excel .xlsx además de CSV (CSV funciona sin esto).
 openpyxl>=3.1.0
 
-# Scraping avanzado con JavaScript (para webs SPA/React que no cargan con urllib)
+# Scraping avanzado de webs SPA/React que no cargan con urllib.
+#   pip install playwright && playwright install chromium
 # playwright>=1.40.0
-# Para instalar: pip install playwright && playwright install chromium
 
-# HTTP con mejor manejo de cookies/sesiones (opcional, urllib funciona bien)
+# HTTP con mejor manejo de cookies/sesiones (urllib funciona bien sin esto).
 # requests>=2.31.0
 
-# Mejor parsing HTML (opcional, BeautifulSoup mejora extracción de contactos)
+# Mejor parsing de HTML para extracción de contactos.
 # beautifulsoup4>=4.12.0
 # lxml>=4.9.0
 
-# Testing
+# --- DESARROLLO / BUILD -------------------------------------------------------
+
+# Tests: el smoke test (tests/test_smoke.py) usa solo unittest (stdlib).
+# pytest es opcional, útil si se prefiere ese runner.
 pytest>=7.4.0
+
+# Generación del ejecutable Windows .exe (ver leadhunter.spec).
+pyinstaller>=6.0.0

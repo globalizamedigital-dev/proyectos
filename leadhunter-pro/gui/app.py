@@ -1083,7 +1083,10 @@ class OutreachTab(tk.Frame):
                 f"Resultados del outreach:\n"
                 f"  Enviados: {results['sent']}\n"
                 f"  Omitidos: {results['skipped']}\n"
+                f"  Suprimidos (baja): {results.get('suppressed', 0)}\n"
+                f"  Rebotados: {results.get('bounced', 0)}\n"
                 f"  Errores: {len(results['errors'])}\n"
+                f"  Cap diario alcanzado: {'SÍ' if results.get('daily_cap_reached') else 'NO'}\n"
                 f"  Modo prueba: {'SÍ' if dry_run else 'NO'}"
             )
             messagebox.showinfo("Outreach completado", msg)
@@ -1099,14 +1102,12 @@ class OutreachTab(tk.Frame):
             messagebox.showerror("Error en outreach", str(e))
 
     def _load_smtp_config(self) -> dict:
-        """Carga la configuración SMTP desde el archivo de config."""
-        config_path = Path.home() / ".cache" / "leadhunter-pro" / "smtp_config.json"
-        if config_path.exists():
-            try:
-                return json.loads(config_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        return {}
+        """Carga la configuración SMTP desde el archivo .env vía scripts/config.py."""
+        try:
+            import config as cfg_module
+            return cfg_module.get_smtp_config()
+        except Exception:
+            return {}
 
     def _gen_linkedin(self):
         if not self._selected_leads:
@@ -1159,154 +1160,167 @@ class OutreachTab(tk.Frame):
 # Tab 5: Configuración
 
 class ConfigTab(tk.Frame):
+    """
+    Tab de configuración. Las credenciales SMTP se leen del archivo .env vía
+    scripts/config.py — NUNCA se persisten en ningún JSON desde la GUI.
+    La contraseña no se muestra ni se guarda: solo se indica si está configurada.
+    """
     def __init__(self, parent, status_var):
         super().__init__(parent, bg=COLORS["bg"])
         self._status_var = status_var
         self._build()
-        self._load_config()
+        self._refresh_status()
 
     def _build(self):
         main = tk.Frame(self, bg=COLORS["bg"])
         main.pack(fill="both", expand=True, padx=24, pady=16)
 
-        def add_field(parent, label, row, is_password=False):
-            tk.Label(parent, text=label, bg=COLORS["bg"],
-                     fg=COLORS["text_dim"], font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=4)
-            var = tk.StringVar()
-            show = "*" if is_password else ""
-            entry = tk.Entry(parent, textvariable=var,
-                             bg=COLORS["input_bg"], fg=COLORS["text"],
-                             insertbackground=COLORS["text"],
-                             show=show, relief="flat", bd=4, width=40, font=("Segoe UI", 10))
-            entry.grid(row=row, column=1, sticky="w", padx=(12, 0), pady=4)
-            return var
+        # --- Cabecera de estado del .env ---
+        SectionLabel(main, "Credenciales (archivo .env)").grid(
+            row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
 
-        # SMTP Config
-        SectionLabel(main, "Configuración SMTP").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        self._env_path_lbl = tk.Label(
+            main, text="", bg=COLORS["bg"], fg=COLORS["text_dim"],
+            font=("Segoe UI", 9), justify="left", anchor="w")
+        self._env_path_lbl.grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 8))
 
-        self._smtp_host_var = add_field(main, "Servidor SMTP", 1)
-        self._smtp_port_var = add_field(main, "Puerto", 2)
-        self._smtp_user_var = add_field(main, "Usuario/Email", 3)
-        self._smtp_pass_var = add_field(main, "Contraseña", 4, is_password=True)
-        self._from_name_var = add_field(main, "Nombre remitente", 5)
-        self._from_email_var = add_field(main, "Email remitente", 6)
+        # --- Tabla de estado de claves SMTP (sin mostrar la contraseña) ---
+        self._keys_frame = tk.Frame(main, bg=COLORS["bg"])
+        self._keys_frame.grid(row=2, column=0, columnspan=2, sticky="we", pady=(0, 8))
 
-        # SSL/TLS
-        opts_frame = tk.Frame(main, bg=COLORS["bg"])
-        opts_frame.grid(row=7, column=0, columnspan=2, sticky="w", pady=8)
-        self._use_tls_var = tk.BooleanVar(value=True)
-        self._use_ssl_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(opts_frame, text="Usar STARTTLS", variable=self._use_tls_var,
-                        bg=COLORS["bg"], fg=COLORS["text"],
-                        activebackground=COLORS["bg"],
-                        selectcolor=COLORS["input_bg"],
-                        font=("Segoe UI", 9)).pack(side="left", padx=(0, 16))
-        tk.Checkbutton(opts_frame, text="Usar SSL (puerto 465)", variable=self._use_ssl_var,
-                        bg=COLORS["bg"], fg=COLORS["text"],
-                        activebackground=COLORS["bg"],
-                        selectcolor=COLORS["input_bg"],
-                        font=("Segoe UI", 9)).pack(side="left")
-
-        # Info Gmail
-        tk.Label(main, text="ℹ Para Gmail: smtp.gmail.com, puerto 587, STARTTLS.\n"
-                              "  Requiere 'Contraseña de aplicación' (no la contraseña normal).",
-                  bg=COLORS["bg"], fg=COLORS["text_dim"],
-                  font=("Segoe UI", 8), justify="left").grid(row=8, column=0, columnspan=2, sticky="w", pady=4)
+        # --- Explicación de seguridad ---
+        info = (
+            "Las credenciales SMTP se cargan desde un archivo .env (no se guardan\n"
+            "en la aplicación). Crea un archivo .env a partir de .env.example y\n"
+            "rellena SMTP_USER, SMTP_PASSWORD, etc. La contraseña NUNCA se muestra\n"
+            "ni se persiste en ningún JSON.\n\n"
+            "Orden de búsqueda del .env:\n"
+            "  1) Ruta de la variable de entorno LEADHUNTER_ENV\n"
+            "  2) ./.env (directorio de trabajo)\n"
+            "  3) <raíz del proyecto>/.env\n"
+            "  4) ~/.leadhunter.env\n\n"
+            "Para Gmail: SMTP_HOST=smtp.gmail.com, SMTP_PORT=587, STARTTLS.\n"
+            "Requiere una 'Contraseña de aplicación' (no la contraseña normal)."
+        )
+        tk.Label(main, text=info, bg=COLORS["bg"], fg=COLORS["text_dim"],
+                 font=("Segoe UI", 8), justify="left").grid(
+            row=3, column=0, columnspan=2, sticky="w", pady=4)
 
         # Separador
-        tk.Frame(main, bg=COLORS["border"], height=1).grid(row=9, column=0, columnspan=2, sticky="we", pady=12)
+        tk.Frame(main, bg=COLORS["border"], height=1).grid(
+            row=4, column=0, columnspan=2, sticky="we", pady=12)
 
-        # Output directory
-        SectionLabel(main, "Directorio de salida").grid(row=10, column=0, columnspan=2, sticky="w", pady=(0, 8))
-        self._output_dir_var = tk.StringVar()
-        output_row = tk.Frame(main, bg=COLORS["bg"])
-        output_row.grid(row=11, column=0, columnspan=2, sticky="we")
-        tk.Entry(output_row, textvariable=self._output_dir_var,
-                  bg=COLORS["input_bg"], fg=COLORS["text"],
-                  insertbackground=COLORS["text"],
-                  relief="flat", bd=4, width=40, font=("Segoe UI", 10)).pack(side="left", padx=(0, 8))
-        IconButton(output_row, "Explorar...", command=self._browse_output,
-                   style="secondary", font=("Segoe UI", 9), padx=8, pady=4).pack(side="left")
-
-        # Botones
+        # --- Botones de acción ---
         btn_row = tk.Frame(main, bg=COLORS["bg"])
-        btn_row.grid(row=12, column=0, columnspan=2, sticky="w", pady=(16, 0))
-        IconButton(btn_row, "Guardar configuración", command=self._save_config).pack(side="left", padx=(0, 8))
+        btn_row.grid(row=5, column=0, columnspan=2, sticky="w")
+        IconButton(btn_row, "Abrir .env", command=self._open_env).pack(side="left", padx=(0, 8))
+        IconButton(btn_row, "Recargar", command=self._refresh_status,
+                   style="secondary", font=("Segoe UI", 9), padx=10, pady=6).pack(side="left", padx=(0, 8))
         IconButton(btn_row, "Probar SMTP", command=self._test_smtp,
                    style="secondary", font=("Segoe UI", 9), padx=10, pady=6).pack(side="left")
 
         # Status config
         self._config_status = tk.Label(main, text="", bg=COLORS["bg"],
-                                        fg=COLORS["text_dim"], font=("Segoe UI", 9))
-        self._config_status.grid(row=13, column=0, columnspan=2, sticky="w", pady=8)
+                                        fg=COLORS["text_dim"], font=("Segoe UI", 9),
+                                        justify="left", anchor="w", wraplength=600)
+        self._config_status.grid(row=6, column=0, columnspan=2, sticky="w", pady=8)
 
-    def _browse_output(self):
-        d = filedialog.askdirectory()
-        if d:
-            self._output_dir_var.set(d)
+    def _refresh_status(self):
+        """Lee el estado de configuración desde config.smtp_config_status()."""
+        try:
+            import config as cfg_module
+            status = cfg_module.smtp_config_status()
+        except Exception as e:  # noqa: BLE001
+            self._env_path_lbl.config(
+                text=f"Error al cargar configuración: {e}", fg=COLORS["error"])
+            return
 
-    def _get_config(self) -> dict:
-        return {
-            "smtp_host": self._smtp_host_var.get().strip(),
-            "smtp_port": int(self._smtp_port_var.get().strip() or "587"),
-            "smtp_user": self._smtp_user_var.get().strip(),
-            "smtp_password": self._smtp_pass_var.get(),
-            "from_name": self._from_name_var.get().strip(),
-            "from_email": self._from_email_var.get().strip(),
-            "use_tls": self._use_tls_var.get(),
-            "use_ssl": self._use_ssl_var.get(),
-            "output_dir": self._output_dir_var.get().strip(),
-        }
-
-    def _save_config(self):
-        config = self._get_config()
-        config_path = Path.home() / ".cache" / "leadhunter-pro" / "smtp_config.json"
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
-        self._config_status.config(text="Configuración guardada", fg=COLORS["success"])
-        self._status_var.set("Configuración SMTP guardada")
-
-    def _load_config(self):
-        config_path = Path.home() / ".cache" / "leadhunter-pro" / "smtp_config.json"
-        if config_path.exists():
-            try:
-                config = json.loads(config_path.read_text(encoding="utf-8"))
-                self._smtp_host_var.set(config.get("smtp_host", "smtp.gmail.com"))
-                self._smtp_port_var.set(str(config.get("smtp_port", "587")))
-                self._smtp_user_var.set(config.get("smtp_user", ""))
-                self._smtp_pass_var.set(config.get("smtp_password", ""))
-                self._from_name_var.set(config.get("from_name", ""))
-                self._from_email_var.set(config.get("from_email", ""))
-                self._use_tls_var.set(config.get("use_tls", True))
-                self._use_ssl_var.set(config.get("use_ssl", False))
-                self._output_dir_var.set(config.get("output_dir", ""))
-            except Exception:
-                pass
+        env_found = status.get("env_found")
+        env_file = status.get("env_file") or ""
+        if env_found:
+            self._env_path_lbl.config(
+                text=f"Archivo .env encontrado: {env_file}", fg=COLORS["success"])
         else:
-            # Defaults
-            self._smtp_host_var.set("smtp.gmail.com")
-            self._smtp_port_var.set("587")
+            self._env_path_lbl.config(
+                text="No se encontró ningún archivo .env — crea uno a partir de .env.example",
+                fg=COLORS["warning"])
+
+        # Redibujar la tabla de claves
+        for w in self._keys_frame.winfo_children():
+            w.destroy()
+        for i, (key, info) in enumerate(status.get("keys", {}).items()):
+            tk.Label(self._keys_frame, text=key, bg=COLORS["bg"],
+                     fg=COLORS["text_dim"], font=("Segoe UI", 9),
+                     width=20, anchor="w").grid(row=i, column=0, sticky="w", pady=2)
+            configured = info.get("configured")
+            display = info.get("display", "")
+            color = COLORS["success"] if configured else COLORS["error"]
+            tk.Label(self._keys_frame, text=display, bg=COLORS["bg"],
+                     fg=color, font=("Segoe UI", 9), anchor="w").grid(
+                row=i, column=1, sticky="w", pady=2)
+
+    def _open_env(self):
+        """Abre el archivo .env activo en el editor del sistema, o explica cómo crearlo."""
+        try:
+            import config as cfg_module
+            env_path = cfg_module.get_env_path()
+        except Exception:
+            env_path = None
+
+        if not env_path:
+            example = _SCRIPTS_DIR.parent / ".env.example"
+            messagebox.showinfo(
+                "Archivo .env no encontrado",
+                "No existe ningún archivo .env todavía.\n\n"
+                f"1) Copia la plantilla:\n   {example}\n"
+                f"2) Renómbrala a '.env' en la raíz del proyecto:\n"
+                f"   {_SCRIPTS_DIR.parent / '.env'}\n"
+                "3) Rellena SMTP_USER, SMTP_PASSWORD, etc.\n\n"
+                "El archivo .env está en .gitignore y nunca se sube al repositorio.")
+            return
+
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(str(env_path))  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                os.system(f'open "{env_path}"')
+            else:
+                os.system(f'xdg-open "{env_path}" >/dev/null 2>&1 &')
+            self._config_status.config(
+                text=f"Abriendo {env_path}", fg=COLORS["text_dim"])
+        except Exception as e:  # noqa: BLE001
+            messagebox.showinfo("Editar .env",
+                                f"Edita manualmente el archivo:\n{env_path}\n\n({e})")
 
     def _test_smtp(self):
-        config = self._get_config()
-        if not config["smtp_user"] or not config["smtp_password"]:
-            messagebox.showwarning("Configuración incompleta",
-                                    "Introduce usuario y contraseña SMTP antes de probar")
+        """Prueba SMTP usando exclusivamente las credenciales del .env."""
+        try:
+            import config as cfg_module
+            smtp_cfg = cfg_module.get_smtp_config()
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Error de configuración", str(e))
+            return
+
+        if not smtp_cfg.get("smtp_user") or not smtp_cfg.get("smtp_password"):
+            messagebox.showwarning(
+                "Configuración incompleta",
+                "Faltan SMTP_USER o SMTP_PASSWORD en el archivo .env.\n"
+                "Usa 'Abrir .env' para configurarlos.")
             return
         try:
             from outreach import send_email
-            # Enviar email de prueba a uno mismo
             send_email(
-                to=config["from_email"] or config["smtp_user"],
+                to=smtp_cfg.get("from_email") or smtp_cfg["smtp_user"],
                 subject="LeadHunter Pro — Prueba de conexión SMTP",
-                body="Este es un email de prueba enviado desde LeadHunter Pro para verificar la configuración SMTP.",
-                config=config,
+                body="Este es un email de prueba enviado desde LeadHunter Pro "
+                     "para verificar la configuración SMTP del archivo .env.",
+                config=smtp_cfg,
             )
             messagebox.showinfo("SMTP OK", "Conexión SMTP correcta. Email de prueba enviado.")
             self._config_status.config(text="SMTP verificado correctamente", fg=COLORS["success"])
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             messagebox.showerror("Error SMTP", str(e))
-            self._config_status.config(text=f"Error SMTP: {str(e)[:60]}", fg=COLORS["error"])
+            self._config_status.config(text=f"Error SMTP: {str(e)[:80]}", fg=COLORS["error"])
 
 
 # ---------------------------------------------------------------------------

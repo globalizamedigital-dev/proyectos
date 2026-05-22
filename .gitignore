@@ -2,6 +2,8 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .env
+*.env
+!.env.example
 .venv/
 venv/
 build/
@@ -10,4 +12,6 @@ dist/
 .cache/
 *.sqlite
 *.db
+*.log
+leadhunter.log
 .DS_Store

@@ -17,4 +17,4 @@ Un saludo,
 [Tu teléfono]
 
 ---
-Si quieres darte de baja de mis comunicaciones, responde con "BAJA".
+P.D.: Si quieres darte de baja de mis comunicaciones, responde con "BAJA" a este correo ({enlace_baja}) y te eliminaré de inmediato.
