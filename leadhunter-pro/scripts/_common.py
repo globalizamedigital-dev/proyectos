@@ -9,10 +9,14 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import logging
+import logging.handlers
 import os
 import re
 import sys
+import threading
 import unicodedata
+import urllib.parse
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -240,11 +244,115 @@ def generar_permutaciones_email(nombre: str, apellido1: str, apellido2: Optional
 
 
 # ---------------------------------------------------------------------------
+# Structured logging
+
+_LOG_PATH = HOME / ".cache" / "leadhunter-pro" / "leadhunter.log"
+_loggers: dict[str, logging.Logger] = {}
+_logger_lock = threading.Lock()
+
+
+def get_logger(name: str = "leadhunter") -> logging.Logger:
+    """
+    Returns a configured logger that writes to both console and a rotating
+    log file at HOME/.cache/leadhunter-pro/leadhunter.log (max 5MB, 3 backups).
+    Idempotent: repeated calls with the same name reuse the same logger.
+    """
+    with _logger_lock:
+        if name in _loggers:
+            return _loggers[name]
+
+        logger = logging.getLogger(f"leadhunter.{name}")
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+
+        if not logger.handlers:
+            fmt = logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S",
+            )
+
+            # Console handler
+            console = logging.StreamHandler()
+            console.setFormatter(fmt)
+            console.setLevel(logging.WARNING)
+            logger.addHandler(console)
+
+            # Rotating file handler
+            try:
+                _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+                file_handler = logging.handlers.RotatingFileHandler(
+                    str(_LOG_PATH), maxBytes=5 * 1024 * 1024, backupCount=3,
+                    encoding="utf-8",
+                )
+                file_handler.setFormatter(fmt)
+                file_handler.setLevel(logging.INFO)
+                logger.addHandler(file_handler)
+            except OSError:
+                pass  # Log file unavailable — console only
+
+        _loggers[name] = logger
+        return logger
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting (per-host throttle)
+
+class RateLimiter:
+    """
+    Thread-safe per-host request throttle. Tracks the last request time per
+    host and sleeps to enforce a minimum interval between requests.
+    """
+    _last_request: dict[str, float] = {}
+    _lock = threading.Lock()
+
+    @classmethod
+    def wait(cls, host: str, min_interval_seconds: float = 1.0) -> None:
+        """Blocks until at least `min_interval_seconds` have passed since the
+        last request to `host`. Records the new request time."""
+        if not host or min_interval_seconds <= 0:
+            return
+        with cls._lock:
+            now = time.monotonic()
+            last = cls._last_request.get(host, 0.0)
+            elapsed = now - last
+            sleep_for = min_interval_seconds - elapsed
+            if sleep_for > 0:
+                time.sleep(sleep_for)
+                cls._last_request[host] = time.monotonic()
+            else:
+                cls._last_request[host] = now
+
+    @classmethod
+    def reset(cls) -> None:
+        """Clears all recorded request times. Mainly for tests."""
+        with cls._lock:
+            cls._last_request.clear()
+
+
+# ---------------------------------------------------------------------------
 # HTTP helper (no external deps, urllib only)
 
-def http_get(url: str, headers: Optional[dict] = None, timeout: int = 15) -> tuple[int, str]:
+# Status codes that warrant a retry: connection failures + transient server errors
+_RETRYABLE_STATUS = {0, -1, 429, 500, 502, 503, 504}
+
+
+def http_get(
+    url: str,
+    headers: Optional[dict] = None,
+    timeout: int = 15,
+    retries: int = 3,
+    rate_limit: float = 1.0,
+) -> tuple[int, str]:
     """
     Returns (status_code, body_text). Never raises on HTTP errors.
+
+    Args:
+        url: URL to fetch.
+        headers: optional extra headers.
+        timeout: per-request timeout in seconds.
+        retries: number of attempts on transient failures (0/-1/429/5xx).
+                 Total attempts = retries (so retries=3 => up to 3 tries).
+        rate_limit: minimum seconds between requests to the same host.
     """
     import urllib.request
     import urllib.error
@@ -257,20 +365,49 @@ def http_get(url: str, headers: Optional[dict] = None, timeout: int = 15) -> tup
     if headers:
         default_headers.update(headers)
 
-    req = urllib.request.Request(url, headers=default_headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.status, r.read().decode("utf-8", errors="replace")
-    except urllib.error.HTTPError as e:
+        host = urllib.parse.urlparse(url).netloc or url
+    except Exception:  # noqa: BLE001
+        host = url
+
+    logger = get_logger("http")
+    attempts = max(1, retries)
+    status, body = -1, ""
+
+    for attempt in range(attempts):
+        # Per-host throttle before every request
+        RateLimiter.wait(host, rate_limit)
+
+        req = urllib.request.Request(url, headers=default_headers)
         try:
-            body = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            body = ""
-        return e.code, body
-    except urllib.error.URLError as e:
-        return 0, str(e)
-    except Exception as e:  # noqa: BLE001
-        return -1, str(e)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                status, body = r.status, r.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            try:
+                body = e.read().decode("utf-8", errors="replace")
+            except Exception:  # noqa: BLE001
+                body = ""
+            status = e.code
+        except urllib.error.URLError as e:
+            status, body = 0, str(e)
+        except Exception as e:  # noqa: BLE001
+            status, body = -1, str(e)
+
+        if status not in _RETRYABLE_STATUS:
+            return status, body
+
+        # Transient failure — back off exponentially (1s, 2s, 4s)
+        if attempt < attempts - 1:
+            backoff = 2 ** attempt
+            logger.warning(
+                "http_get %s -> status %s, retry %d/%d in %ds",
+                url, status, attempt + 1, attempts - 1, backoff,
+            )
+            time.sleep(backoff)
+
+    logger.error("http_get %s failed after %d attempts (last status %s)",
+                 url, attempts, status)
+    return status, body
 
 
 def http_post(url: str, data: dict, headers: Optional[dict] = None, timeout: int = 15) -> tuple[int, str]:

@@ -18,6 +18,7 @@ import re
 import smtplib
 import sqlite3
 import sys
+import time
 import urllib.parse
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
@@ -27,14 +28,21 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import (
-    HOME, SKILL_DIR, emit_observation, now_iso,
+    HOME, SKILL_DIR, emit_observation, get_logger, now_iso,
 )
+import suppression
+
+_log = get_logger("outreach")
 
 # Base de datos SQLite para tracking
 DB_PATH = HOME / ".cache" / "leadhunter-pro" / "outreach.db"
 
 # Directorio de plantillas
 TEMPLATES_DIR = SKILL_DIR / "templates"
+
+# Límites de entregabilidad por defecto
+DEFAULT_MIN_SECONDS_BETWEEN_SENDS = 45
+DEFAULT_DAILY_CAP = 40
 
 
 # ---------------------------------------------------------------------------
@@ -137,6 +145,58 @@ def has_been_contacted(to_email: str, days: int = 30) -> bool:
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     recent = [h for h in history if h.get("ts", "") >= cutoff and h.get("status") == "sent"]
     return bool(recent)
+
+
+def get_sent_today_count() -> int:
+    """Cuenta los emails realmente enviados hoy (status='sent') — cap diario."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    conn = _init_db()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM outreach_log "
+            "WHERE status = 'sent' AND substr(ts, 1, 10) = ?",
+            (today,),
+        ).fetchone()
+        return int(row["n"]) if row else 0
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Cumplimiento legal: supresión, bajas y rebotes
+
+def process_unsubscribe_request(email: str) -> int:
+    """
+    Procesa una solicitud de baja (respuesta 'BAJA' a un email).
+    Añade el email a la lista de supresión.
+
+    Returns:
+        id de la entrada de supresión.
+    """
+    sid = suppression.add_suppression(
+        email=email, reason="email-reply-baja", source="outreach",
+    )
+    _log.info("Baja procesada para %s (supresión id=%s)", email, sid)
+    emit_observation("outreach", {"action": "unsubscribe", "email": email})
+    return sid
+
+
+def mark_bounced(email: str) -> int:
+    """
+    Marca un email como rebotado (hard bounce) y lo añade a la lista de
+    supresión para no volver a enviarle.
+
+    Returns:
+        id de la entrada de supresión.
+    """
+    sid = suppression.add_suppression(
+        email=email, reason="hard-bounce", source="outreach",
+    )
+    log_outreach(to_email=email, channel="email", status="bounced",
+                 error="hard-bounce")
+    _log.warning("Email rebotado %s añadido a supresión (id=%s)", email, sid)
+    emit_observation("outreach", {"action": "bounce", "email": email})
+    return sid
 
 
 # ---------------------------------------------------------------------------
