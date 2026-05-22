@@ -182,42 +182,52 @@ def upsert_lead(lead: dict) -> int:
 
     conn = _init_db()
     try:
-        existing = conn.execute(
-            "SELECT id, first_seen, outreach_status FROM leads WHERE dedup_key = ?",
-            (dedup_key,),
-        ).fetchone()
+        try:
+            existing = conn.execute(
+                "SELECT id, first_seen, outreach_status FROM leads WHERE dedup_key = ?",
+                (dedup_key,),
+            ).fetchone()
 
-        if existing:
-            lead_id = existing["id"]
-            first_seen = existing["first_seen"] or now
-            # Conserva el estado de outreach existente
-            outreach_status = existing["outreach_status"] or "new"
-            conn.execute(
-                """UPDATE leads SET
-                       nif=?, razon_social=?, domain=?, score=?, email_principal=?,
-                       decisor=?, telefono=?, provincia=?, sector=?,
-                       last_seen=?, data=?
-                   WHERE id=?""",
-                (normalize_nif(nif) if nif else None, razon_social, domain, score,
-                 email, decisor, telefono, provincia, sector, now, data_json, lead_id),
-            )
-            conn.commit()
-            _log.info("Lead actualizado id=%d key=%s", lead_id, dedup_key)
-            return lead_id
-        else:
-            cur = conn.execute(
-                """INSERT INTO leads
-                       (dedup_key, nif, razon_social, domain, score, email_principal,
-                        decisor, telefono, provincia, sector, outreach_status,
-                        first_seen, last_seen, data)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (dedup_key, normalize_nif(nif) if nif else None, razon_social, domain,
-                 score, email, decisor, telefono, provincia, sector, "new",
-                 now, now, data_json),
-            )
-            conn.commit()
-            _log.info("Lead insertado id=%d key=%s", cur.lastrowid, dedup_key)
-            return cur.lastrowid
+            if existing:
+                lead_id = existing["id"]
+                first_seen = existing["first_seen"] or now
+                # Conserva el estado de outreach existente
+                outreach_status = existing["outreach_status"] or "new"
+                conn.execute(
+                    """UPDATE leads SET
+                           nif=?, razon_social=?, domain=?, score=?, email_principal=?,
+                           decisor=?, telefono=?, provincia=?, sector=?,
+                           last_seen=?, data=?
+                       WHERE id=?""",
+                    (normalize_nif(nif) if nif else None, razon_social, domain, score,
+                     email, decisor, telefono, provincia, sector, now, data_json, lead_id),
+                )
+                conn.commit()
+                _log.info("Lead actualizado id=%d key=%s", lead_id, dedup_key)
+                return lead_id
+            else:
+                cur = conn.execute(
+                    """INSERT INTO leads
+                           (dedup_key, nif, razon_social, domain, score, email_principal,
+                            decisor, telefono, provincia, sector, outreach_status,
+                            first_seen, last_seen, data)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (dedup_key, normalize_nif(nif) if nif else None, razon_social, domain,
+                     score, email, decisor, telefono, provincia, sector, "new",
+                     now, now, data_json),
+                )
+                conn.commit()
+                _log.info("Lead insertado id=%d key=%s", cur.lastrowid, dedup_key)
+                return cur.lastrowid
+        except Exception:
+            # Si algo revienta entre execute() y commit() dejamos la BD en
+            # estado consistente. SQLite descartaría la transacción al cerrar
+            # la conexión, pero rollback explícito es más predecible.
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
     finally:
         conn.close()
 

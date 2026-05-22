@@ -43,9 +43,24 @@ def fetch_feed(year: int) -> Optional[str]:
         return cached
     url = PLACSP_FEED_TEMPLATE.format(year=year)
     status, body = http_get(url, timeout=30)
-    if status != 200 or "<feed" not in body[:500]:
+    if status != 200:
         SourceStatus.mark("PLACSP", f"http-{status}")
         emit_observation("source_unavailable", {"source": "PLACSP", "year": year, "status": status})
+        return None
+    # status==200 con HTML de error: el portal devuelve una página de error
+    # con código 200 cuando el certificado/IP no está autorizado o cuando el
+    # feed dejó de publicarse. Detectamos por la ausencia de `<feed` y por
+    # marcadores conocidos del HTML de error.
+    head = body[:1500].lower()
+    if "<feed" not in body[:500]:
+        if "certificado" in head and "autorizado" in head:
+            mark = "requires-cert"
+        elif "<html" in head or "error" in head:
+            mark = "html-error-200"
+        else:
+            mark = "not-atom"
+        SourceStatus.mark("PLACSP", mark)
+        emit_observation("source_unavailable", {"source": "PLACSP", "year": year, "status": mark})
         return None
     cache_set(CACHE, cache_key, body)
     return body

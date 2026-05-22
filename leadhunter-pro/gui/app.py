@@ -263,12 +263,27 @@ PROVINCIAS = [
 # Tab 1: Descubrir
 
 class DescubrirTab(tk.Frame):
-    def __init__(self, parent, status_var, result_queue):
+    def __init__(self, parent, status_var):
         super().__init__(parent, bg=COLORS["bg"])
         self._status_var = status_var
-        self._result_queue = result_queue
+        # Cola privada por tab: si se compartiera, un mensaje destinado a otro
+        # tab sería desencolado aquí y perdido (causa real del "Buscando..."
+        # perpetuo que vimos en sesión).
+        self._result_queue: queue.Queue = queue.Queue()
         self._leads: list[dict] = []
+        self._busy = False
+        self._poll_after_id: Optional[str] = None
         self._build()
+
+    def stop(self) -> None:
+        """Cancela el polling pendiente para que el cierre de ventana no
+        intente tocar widgets ya destruidos."""
+        if self._poll_after_id is not None:
+            try:
+                self.after_cancel(self._poll_after_id)
+            except Exception:
+                pass
+            self._poll_after_id = None
 
     def _build(self):
         # Header form
@@ -379,6 +394,11 @@ class DescubrirTab(tk.Frame):
         self._tree.tag_configure("grade_d", foreground=COLORS["score_d"])
 
     def _run_search(self):
+        # Anti doble-click: si ya hay una búsqueda en curso, ignorar.
+        # Esto debe ser lo primero, antes de tocar nada de UI.
+        if self._busy:
+            return
+
         province = self._province_var.get()
         sector = self._sector_var.get().strip()
         max_r = self._max_var.get()
@@ -388,6 +408,7 @@ class DescubrirTab(tk.Frame):
             messagebox.showwarning("LeadHunter Pro", "Por favor introduce un sector o CNAE")
             return
 
+        self._busy = True
         self._btn_search.config(state="disabled", text="Buscando...")
         self._spinner.start()
         self._status_var.set(f"Buscando leads: {sector} en {province}...")
@@ -401,32 +422,50 @@ class DescubrirTab(tk.Frame):
                 self._result_queue.put(("discover_error", str(e)))
 
         threading.Thread(target=run_in_thread, daemon=True).start()
-        self._poll_queue()
+        # Solo arrancar el poll si no hay otro corriendo ya.
+        if self._poll_after_id is None:
+            self._poll_after_id = self.after(150, self._poll_queue)
 
     def _poll_queue(self):
+        """Polling self-rescheduling. Siempre se reagenda en finally para
+        que la app siga escuchando la cola hasta que stop() la cancele."""
+        self._poll_after_id = None
         try:
-            msg_type, data = self._result_queue.get_nowait()
+            try:
+                msg_type, data = self._result_queue.get_nowait()
+            except queue.Empty:
+                return
             if msg_type == "discover_result":
                 self._on_search_complete(data)
             elif msg_type == "discover_error":
                 self._on_search_error(data)
-            else:
-                self._result_queue.task_done()
-                self.after(100, self._poll_queue)
-        except queue.Empty:
-            self.after(200, self._poll_queue)
+            # msg_types desconocidos se descartan silenciosamente; no se
+            # vuelven a encolar (ya están desencolados).
+        finally:
+            # Reagendar siempre, salvo que stop() haya cancelado.
+            if self._poll_after_id is None:
+                self._poll_after_id = self.after(200, self._poll_queue)
 
     def _on_search_complete(self, payload: dict):
+        self._busy = False
         self._spinner.stop()
         self._btn_search.config(state="normal", text="  Buscar Leads")
-        candidates = payload.get("candidates", [])
+        # Validar shape del payload: si el worker devolvió algo raro, tratarlo
+        # como error en vez de crashear iterando sobre None.
+        if not isinstance(payload, dict) or not isinstance(payload.get("candidates"), list):
+            self._on_search_error("Respuesta inválida del worker de discover")
+            return
+        candidates = payload["candidates"]
         self._leads = candidates
         self._populate_tree(candidates)
         count = len(candidates)
-        self._result_count_lbl.config(text=f"{count} leads encontrados — {payload.get('totalUnresolvedDomain', 0)} sin dominio")
+        self._result_count_lbl.config(
+            text=f"{count} leads encontrados — {payload.get('totalUnresolvedDomain', 0)} sin dominio"
+        )
         self._status_var.set(f"Búsqueda completada: {count} leads")
 
     def _on_search_error(self, error: str):
+        self._busy = False
         self._spinner.stop()
         self._btn_search.config(state="normal", text="  Buscar Leads")
         self._status_var.set(f"Error: {error[:80]}")
@@ -531,11 +570,22 @@ class DescubrirTab(tk.Frame):
 # Tab 2: Analizar
 
 class AnalizarTab(tk.Frame):
-    def __init__(self, parent, status_var, result_queue):
+    def __init__(self, parent, status_var):
         super().__init__(parent, bg=COLORS["bg"])
         self._status_var = status_var
-        self._result_queue = result_queue
+        # Cola privada por tab (ver nota en DescubrirTab).
+        self._result_queue: queue.Queue = queue.Queue()
+        self._busy = False
+        self._poll_after_id: Optional[str] = None
         self._build()
+
+    def stop(self) -> None:
+        if self._poll_after_id is not None:
+            try:
+                self.after_cancel(self._poll_after_id)
+            except Exception:
+                pass
+            self._poll_after_id = None
 
     def _build(self):
         # Form
@@ -598,11 +648,14 @@ class AnalizarTab(tk.Frame):
         self._result_text.tag_configure("score_d", foreground=COLORS["score_d"])
 
     def _run_analyze(self):
+        if self._busy:
+            return
         input_str = self._input_var.get().strip()
         if not input_str:
             messagebox.showwarning("LeadHunter Pro", "Introduce un NIF o razón social")
             return
 
+        self._busy = True
         self._btn_analyze.config(state="disabled", text="Analizando...")
         self._spinner.start()
         self._status_var.set(f"Analizando: {input_str}...")
@@ -619,28 +672,36 @@ class AnalizarTab(tk.Frame):
                 self._result_queue.put(("analyze_error", str(e)))
 
         threading.Thread(target=run_in_thread, daemon=True).start()
-        self._poll_queue()
+        if self._poll_after_id is None:
+            self._poll_after_id = self.after(150, self._poll_queue)
 
     def _poll_queue(self):
+        self._poll_after_id = None
         try:
-            msg_type, data = self._result_queue.get_nowait()
+            try:
+                msg_type, data = self._result_queue.get_nowait()
+            except queue.Empty:
+                return
             if msg_type == "analyze_result":
                 self._on_analyze_complete(data)
             elif msg_type == "analyze_error":
                 self._on_analyze_error(data)
-            else:
-                self._result_queue.task_done()
-                self.after(100, self._poll_queue)
-        except queue.Empty:
-            self.after(200, self._poll_queue)
+        finally:
+            if self._poll_after_id is None:
+                self._poll_after_id = self.after(200, self._poll_queue)
 
     def _on_analyze_complete(self, payload: dict):
+        self._busy = False
         self._spinner.stop()
         self._btn_analyze.config(state="normal", text="  Analizar")
+        if not isinstance(payload, dict):
+            self._on_analyze_error("Respuesta inválida del worker de analyze")
+            return
         self._render_analysis(payload)
         self._status_var.set("Análisis completado")
 
     def _on_analyze_error(self, error: str):
+        self._busy = False
         self._spinner.stop()
         self._btn_analyze.config(state="normal", text="  Analizar")
         self._status_var.set(f"Error: {error[:80]}")
@@ -1294,7 +1355,10 @@ class ConfigTab(tk.Frame):
                                 f"Edita manualmente el archivo:\n{env_path}\n\n({e})")
 
     def _test_smtp(self):
-        """Prueba SMTP usando exclusivamente las credenciales del .env."""
+        """Prueba SMTP usando exclusivamente las credenciales del .env.
+        El envío corre en un thread y la UI se desbloquea — si el servidor
+        SMTP cuelga, la app no se congela: el thread queda en background
+        hasta que termine o caduque, pero la ventana sigue respondiendo."""
         try:
             import config as cfg_module
             smtp_cfg = cfg_module.get_smtp_config()
@@ -1308,20 +1372,39 @@ class ConfigTab(tk.Frame):
                 "Faltan SMTP_USER o SMTP_PASSWORD en el archivo .env.\n"
                 "Usa 'Abrir .env' para configurarlos.")
             return
+
+        self._config_status.config(text="Probando SMTP...", fg=COLORS["text_dim"])
+        result_q: queue.Queue = queue.Queue()
+
+        def worker():
+            try:
+                from outreach import send_email
+                send_email(
+                    to=smtp_cfg.get("from_email") or smtp_cfg["smtp_user"],
+                    subject="LeadHunter Pro — Prueba de conexión SMTP",
+                    body="Este es un email de prueba enviado desde LeadHunter Pro "
+                         "para verificar la configuración SMTP del archivo .env.",
+                    config=smtp_cfg,
+                )
+                result_q.put(("ok", None))
+            except Exception as e:  # noqa: BLE001
+                result_q.put(("err", str(e)))
+
+        threading.Thread(target=worker, daemon=True).start()
+        self._poll_smtp_result(result_q)
+
+    def _poll_smtp_result(self, result_q: "queue.Queue") -> None:
         try:
-            from outreach import send_email
-            send_email(
-                to=smtp_cfg.get("from_email") or smtp_cfg["smtp_user"],
-                subject="LeadHunter Pro — Prueba de conexión SMTP",
-                body="Este es un email de prueba enviado desde LeadHunter Pro "
-                     "para verificar la configuración SMTP del archivo .env.",
-                config=smtp_cfg,
-            )
+            status, payload = result_q.get_nowait()
+        except queue.Empty:
+            self.after(200, lambda: self._poll_smtp_result(result_q))
+            return
+        if status == "ok":
             messagebox.showinfo("SMTP OK", "Conexión SMTP correcta. Email de prueba enviado.")
             self._config_status.config(text="SMTP verificado correctamente", fg=COLORS["success"])
-        except Exception as e:  # noqa: BLE001
-            messagebox.showerror("Error SMTP", str(e))
-            self._config_status.config(text=f"Error SMTP: {str(e)[:80]}", fg=COLORS["error"])
+        else:
+            messagebox.showerror("Error SMTP", str(payload))
+            self._config_status.config(text=f"Error SMTP: {str(payload)[:80]}", fg=COLORS["error"])
 
 
 # ---------------------------------------------------------------------------
@@ -1365,10 +1448,21 @@ class StatusBar(tk.Frame):
                                      font=("Segoe UI", 9), anchor="w")
         self._status_lbl.pack(side="left", padx=8)
 
-        # Actualizar indicadores de fuentes periódicamente
-        self.after(2000, self._update_sources)
+        # Actualizar indicadores de fuentes periódicamente. Guardamos el id
+        # para poder cancelar el loop al cerrar la ventana (si no, after()
+        # sigue disparando contra widgets destruidos).
+        self._after_id: Optional[str] = self.after(2000, self._update_sources)
+
+    def stop(self) -> None:
+        if self._after_id is not None:
+            try:
+                self.after_cancel(self._after_id)
+            except Exception:
+                pass
+            self._after_id = None
 
     def _update_sources(self):
+        self._after_id = None
         try:
             from _common import SourceStatus
             snapshot = SourceStatus.snapshot()
@@ -1381,7 +1475,9 @@ class StatusBar(tk.Frame):
                           font=("Segoe UI", 8)).pack(side="left", padx=4)
         except Exception:
             pass
-        self.after(3000, self._update_sources)
+        # Reagendar salvo que stop() haya sido llamado mientras tanto.
+        if self._after_id is None:
+            self._after_id = self.after(3000, self._update_sources)
 
 
 # ---------------------------------------------------------------------------
@@ -1401,9 +1497,12 @@ class LeadHunterApp(tk.Tk):
         configure_styles()
 
         self._status_var = tk.StringVar(value="Listo.")
-        self._result_queue: queue.Queue = queue.Queue()
 
         self._build()
+        # Intercepta el cierre de la ventana para cancelar los after() loops
+        # antes de destroy(). Sin esto, Tk dispara callbacks contra widgets
+        # ya destruidos y deja el proceso colgando esperando daemon threads.
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _build(self):
         # Header
@@ -1421,12 +1520,12 @@ class LeadHunterApp(tk.Tk):
         nb = ttk.Notebook(self)
         nb.pack(fill="both", expand=True)
 
-        # Tab 1: Descubrir
-        self._tab_descubrir = DescubrirTab(nb, self._status_var, self._result_queue)
+        # Tab 1: Descubrir (cola privada interna)
+        self._tab_descubrir = DescubrirTab(nb, self._status_var)
         nb.add(self._tab_descubrir, text="  Descubrir  ")
 
-        # Tab 2: Analizar
-        self._tab_analizar = AnalizarTab(nb, self._status_var, self._result_queue)
+        # Tab 2: Analizar (cola privada interna)
+        self._tab_analizar = AnalizarTab(nb, self._status_var)
         nb.add(self._tab_analizar, text="  Analizar  ")
 
         # Tab 3: Leads
@@ -1445,8 +1544,26 @@ class LeadHunterApp(tk.Tk):
         nb.bind("<<NotebookTabChanged>>", self._on_tab_change)
 
         # Status bar
-        status_bar = StatusBar(self, self._status_var)
-        status_bar.pack(fill="x", side="bottom")
+        self._status_bar = StatusBar(self, self._status_var)
+        self._status_bar.pack(fill="x", side="bottom")
+
+    def _on_close(self) -> None:
+        """Cancela todos los after() pendientes y destruye la ventana."""
+        for comp in (
+            getattr(self, "_tab_descubrir", None),
+            getattr(self, "_tab_analizar", None),
+            getattr(self, "_status_bar", None),
+        ):
+            stop = getattr(comp, "stop", None)
+            if callable(stop):
+                try:
+                    stop()
+                except Exception:
+                    pass
+        try:
+            self.destroy()
+        except Exception:
+            pass
 
     def _on_tab_change(self, event):
         """Sincroniza leads cuando se cambia de tab."""

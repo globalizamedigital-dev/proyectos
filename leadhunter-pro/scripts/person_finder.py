@@ -48,47 +48,45 @@ TEAM_PATHS = [
 ]
 
 
+# Set precomputado con todas las palabras-clave de rol en minúscula. Usado
+# para descartar matches de tarjeta cuyo "rol" capturado es ruido.
+_ROLE_KEYWORDS_LOWER = {r.lower() for r in ROLES_INTERES}
+
+
+def _rol_contains_role_keyword(rol: str) -> bool:
+    """¿El texto capturado como rol incluye alguna palabra de ROLES_INTERES?
+    Sin esta validación, las regex de tarjeta (`<h2-5>nombre</h2-5>` + 5-60
+    caracteres siguientes) aceptan titulares y eslóganes como roles válidos
+    (vimos "Pisos en venta", "color azul", etc. en producción)."""
+    if not rol:
+        return False
+    rol_lower = rol.lower()
+    return any(kw in rol_lower for kw in _ROLE_KEYWORDS_LOWER)
+
+
 def _extract_names_from_html(html: str, razon_social: str) -> list[dict]:
     """
     Extrae nombres y roles de una página HTML de empresa.
-    Busca patrones de nombres seguidos de roles en tarjetas de equipo.
+
+    Orden de aplicación (de más a menos preciso):
+      1. Texto libre con rol adyacente ("Juan García, Director General...") —
+         exige rol conocido, casi nunca produce falsos positivos.
+      2. Tarjetas con `<h2-5>` o `<dt>/<dd>` — solo se aceptan si el texto
+         capturado como "rol" contiene alguna palabra de ROLES_INTERES.
+    El antiguo patrón `class="name|nombre"` se ha eliminado: no aportaba rol
+    para validar y dejaba pasar cualquier nombre propio del DOM (banners,
+    testimonios, breadcrumbs).
     """
     found = []
     if not html:
         return found
 
-    # Limpiar HTML para análisis
-    # Eliminar scripts y estilos
+    # Limpiar scripts y estilos
     clean = re.sub(r"<script[^>]*>.*?</script>", " ", html, flags=re.DOTALL | re.IGNORECASE)
     clean = re.sub(r"<style[^>]*>.*?</style>", " ", clean, flags=re.DOTALL | re.IGNORECASE)
 
-    # Buscar bloques de tarjetas de equipo (estructura típica)
-    # Patrón 1: h3/h4 con nombre seguido de p/span con rol
-    card_patterns = [
-        re.compile(r'<(?:h[2-5]|strong)[^>]*>([A-ZÁÉÍÓÚÑÜ][a-záéíóúñüa-zA-Z\s]{4,35})</(?:h[2-5]|strong)>\s*(?:<[^>]+>)*\s*([^<]{5,60})', re.IGNORECASE),
-        re.compile(r'class="[^"]*(?:name|nombre)[^"]*"[^>]*>([A-ZÁÉÍÓÚÑÜ][a-záéíóúñüa-zA-Z\s]{4,35})</[^>]+>', re.IGNORECASE),
-        re.compile(r'<dt[^>]*>([A-ZÁÉÍÓÚÑÜ][a-záéíóúñüa-zA-Z\s]{4,35})</dt>\s*<dd[^>]*>([^<]{5,60})</dd>', re.IGNORECASE),
-    ]
-
-    for pattern in card_patterns:
-        for m in pattern.finditer(clean):
-            nombre = m.group(1).strip()
-            rol = m.group(2).strip() if m.lastindex >= 2 else ""
-            rol = re.sub(r"<[^>]+>", "", rol).strip()
-
-            if not _looks_like_person_name(nombre):
-                continue
-
-            found.append({
-                "name": nombre,
-                "role": _classify_role(rol),
-                "raw_role": rol[:100],
-                "source": "web-team-page",
-                "linkedin_hint": _guess_linkedin(nombre, razon_social),
-            })
-
-    # Patrón 2: buscar nombres + rol en texto libre
-    # "Juan García López, Director General de..."
+    # 1) Texto libre con rol adyacente — pasada PRIMERO porque es la más
+    # precisa: exige una palabra de ROLES_INTERES junto al nombre.
     free_text_pattern = re.compile(
         r'([A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+(?:\s+[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+){1,3})'
         r'\s*,?\s*'
@@ -112,7 +110,41 @@ def _extract_names_from_html(html: str, razon_social: str) -> list[dict]:
             "linkedin_hint": _guess_linkedin(nombre, razon_social),
         })
 
-    # Deduplicar por nombre normalizado
+    # 2) Tarjetas <h2-5>/<dt>+<dd>: solo si el rol capturado es real.
+    card_patterns = [
+        re.compile(
+            r'<(?:h[2-5]|strong)[^>]*>([A-ZÁÉÍÓÚÑÜ][a-záéíóúñüa-zA-Z\s]{4,35})</(?:h[2-5]|strong)>'
+            r'\s*(?:<[^>]+>)*\s*([^<]{3,80})',
+            re.IGNORECASE
+        ),
+        re.compile(
+            r'<dt[^>]*>([A-ZÁÉÍÓÚÑÜ][a-záéíóúñüa-zA-Z\s]{4,35})</dt>\s*<dd[^>]*>([^<]{3,80})</dd>',
+            re.IGNORECASE
+        ),
+    ]
+
+    for pattern in card_patterns:
+        for m in pattern.finditer(clean):
+            nombre = m.group(1).strip()
+            rol = m.group(2).strip()
+            rol = re.sub(r"<[^>]+>", "", rol).strip()
+
+            if not _looks_like_person_name(nombre):
+                continue
+            # Sin rol válido, la tarjeta no es de equipo: descartar.
+            if not _rol_contains_role_keyword(rol):
+                continue
+
+            found.append({
+                "name": nombre,
+                "role": _classify_role(rol),
+                "raw_role": rol[:100],
+                "source": "web-team-page",
+                "linkedin_hint": _guess_linkedin(nombre, razon_social),
+            })
+
+    # Deduplicar por nombre normalizado, conservando la primera ocurrencia
+    # (que viene del patrón más preciso).
     seen_names = set()
     deduped = []
     for p in found:
@@ -124,26 +156,68 @@ def _extract_names_from_html(html: str, razon_social: str) -> list[dict]:
     return deduped
 
 
+# Conectores que pueden ir en minúscula dentro de un nombre español.
+_NAME_CONNECTORS = {"de", "del", "la", "las", "los", "y", "i", "da", "do"}
+
+# Palabras que delatan que el texto es un titular/eslogan, no un nombre.
+# Si aparece cualquiera, se descarta. Cubre verbos, sustantivos comerciales
+# y adjetivos comunes en webs de PYMEs (sobre todo inmobiliarias).
+_NOT_NAME_WORDS = {
+    "pisos", "piso", "viviendas", "vivienda", "venta", "alquiler", "comprar",
+    "vender", "inmuebles", "inmueble", "casas", "casa", "local", "locales",
+    "oficina", "oficinas", "chalet", "ático", "atico", "objetivo", "objetivos",
+    "color", "colores", "azul", "verde", "rojo", "nuestra", "nuestro",
+    "nuestras", "nuestros", "descubre", "descubra", "expertise", "servicio",
+    "servicios", "calidad", "experiencia", "contacto", "contáctanos",
+    "nosotros", "empresa", "equipo", "inicio", "home", "blog", "menu",
+    "menú", "principal", "principales", "soluciones", "solución", "proyecto",
+    "proyectos", "cliente", "clientes", "garantía", "garantia", "confianza",
+    "más", "mas", "info", "promoción", "promociones", "oferta", "ofertas",
+    "leer", "saber", "ver", "todos", "todas", "gestión", "gestion",
+    "consultoría", "consultoria", "asesoramiento", "compra", "reformas",
+}
+
+
 def _looks_like_person_name(text: str) -> bool:
     """Verifica que el texto parezca un nombre de persona (no empresa, no frase)."""
-    if not text or len(text) < 5 or len(text) > 60:
+    if not text or len(text) < 5 or len(text) > 50:
         return False
-    # Debe tener al menos 2 palabras
+    if re.search(r'[0-9@<>&\[\]{}|\\/.,:;!?¿¡"]', text):
+        return False
+
     words = text.strip().split()
-    if len(words) < 2:
+    # Un nombre español típico: 2 a 4 palabras (nombre + 1-2 apellidos).
+    if not (2 <= len(words) <= 4):
         return False
-    # No debe contener signos de puntuación extraños
-    if re.search(r'[0-9@<>&\[\]{}|\\]', text):
-        return False
-    # Primera letra de cada palabra debe ser mayúscula o minúscula (no todo mayúsculas = empresa)
-    if text == text.upper() and len(text) > 10:
-        return False
-    # No debe ser claramente un nombre de empresa
-    company_indicators = ["s.l.", "s.a.", "ltda", "inc.", "corp.", "grupo", "servicios", "soluciones"]
+
     text_lower = text.lower()
+    # Indicadores de razón social.
+    company_indicators = ["s.l.", "s.a.", "ltda", "inc.", "corp.", "grupo",
+                          "servicios", "soluciones", "asociados", "consulting"]
     if any(ind in text_lower for ind in company_indicators):
         return False
-    return True
+
+    significant = 0
+    for w in words:
+        wl = w.lower()
+        # Palabra de eslogan/titular => no es un nombre.
+        if wl in _NOT_NAME_WORDS:
+            return False
+        # Solo letras (con acentos y guion para nombres compuestos).
+        if not re.fullmatch(r"[A-Za-zÁÉÍÓÚÑÜáéíóúñü-]+", w):
+            return False
+        if wl in _NAME_CONNECTORS:
+            continue
+        # Cada palabra significativa debe ir en Mayúscula inicial (nombre propio).
+        if not w[0].isupper():
+            return False
+        # ...y no ser TODA mayúsculas (eso es un titular o sigla).
+        if w.isupper() and len(w) > 3:
+            return False
+        significant += 1
+
+    # Al menos 2 palabras significativas (nombre + apellido).
+    return significant >= 2
 
 
 def _classify_role(raw_role: str) -> str:

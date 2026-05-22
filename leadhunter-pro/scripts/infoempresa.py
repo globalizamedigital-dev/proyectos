@@ -28,9 +28,18 @@ from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observ
 CACHE = CacheConfig(namespace="infoempresa", ttl_seconds=60 * 60 * 24 * 7)
 
 INFOEMPRESA_BASE = "https://www.infoempresa.com"
-INFOEMPRESA_SEARCH = INFOEMPRESA_BASE + "/buscar/es/empresa?filtros={query}"
-INFOEMPRESA_COMPANY = INFOEMPRESA_BASE + "/empresa/es/{slug}"
-INFOEMPRESA_NIF = INFOEMPRESA_BASE + "/empresa/es/cif/{nif}"
+# InfoEmpresa migró en 2025-2026 a la estructura /es-es/es/. Las URLs antiguas
+# devolvían 301 a la home (sin conservar el NIF/slug) y luego una página
+# prácticamente vacía. Las nuevas URLs sí responden con contenido, aunque la
+# web sigue siendo agresiva con scrapers: si el body es minúsculo o no tiene
+# señales de página de empresa, marcamos la fuente como `blocked` y seguimos.
+INFOEMPRESA_SEARCH = INFOEMPRESA_BASE + "/es-es/es/buscar?filtros={query}"
+INFOEMPRESA_COMPANY = INFOEMPRESA_BASE + "/es-es/es/empresa/{slug}"
+INFOEMPRESA_NIF = INFOEMPRESA_BASE + "/es-es/es/empresa/cif/{nif}"
+
+# Tamaño mínimo de body para considerar que la página tiene contenido real.
+# Una página vacía o de login-wall típica pesa <2KB; las fichas reales >20KB.
+_INFOEMPRESA_MIN_BODY = 2000
 
 
 def _slugify(razon_social: str) -> str:
@@ -209,14 +218,18 @@ def search(query: str, max_results: int = 5) -> list[dict]:
     if status != 200:
         SourceStatus.mark("InfoEmpresa", f"http-{status}")
         return []
+    # Login-wall / página vacía: la web responde 200 pero sin contenido útil.
+    if len(body) < _INFOEMPRESA_MIN_BODY:
+        SourceStatus.mark("InfoEmpresa", "blocked")
+        return []
 
     SourceStatus.mark("InfoEmpresa", "ok")
 
-    # Extraer resultados de búsqueda
-    results = []
-    # Patrón para links de empresa en resultados
+    # Extraer resultados de búsqueda (links a ficha de empresa).
+    # Aceptamos tanto la ruta antigua /empresa/es/ como la nueva /es-es/es/empresa/
+    # para no romper si la web vuelve a cambiar la estructura.
     link_pattern = re.compile(
-        r'href="(/empresa/es/[^"]+)"[^>]*>\s*<[^>]+>\s*([^<]+)</[^>]+>',
+        r'href="(/(?:es-es/es/)?empresa/[^"]+)"[^>]*>\s*<[^>]+>\s*([^<]+)</[^>]+>',
         re.IGNORECASE
     )
     seen_urls: set[str] = set()
@@ -269,13 +282,16 @@ def lookup(razon_social: Optional[str] = None, nif: Optional[str] = None) -> dic
         nif_upper = nif.strip().upper()
         url = INFOEMPRESA_NIF.format(nif=nif_upper)
         status, body = http_get(url, timeout=20)
-        if status == 200 and len(body) > 500:
+        if status == 200 and len(body) > _INFOEMPRESA_MIN_BODY:
             result = _parse_company_page(body, url)
             if result.get("razonSocial") or result.get("nif"):
                 SourceStatus.mark("InfoEmpresa", "ok")
                 cache_set(CACHE, cache_key, result)
                 emit_observation("tool_lead_recon", {"phase": "infoempresa.lookup", "nif": nif, "found": True})
                 return result
+        elif status == 200:
+            # 200 con body minúsculo => login-wall o bloqueo.
+            SourceStatus.mark("InfoEmpresa", "blocked")
 
     # Búsqueda por razón social
     if razon_social:

@@ -58,12 +58,22 @@ def geocode(address: str) -> Optional[dict]:
         SourceStatus.mark("Cartociudad", f"http-{status}")
         return None
 
-    # Cartociudad response shape (v2): list under root or {"results": [...]}.
-    candidates = payload if isinstance(payload, list) else payload.get("results") or []
-    if not candidates:
+    # Cartociudad response shape (v2): list under root o {"results": [...]}.
+    # Endurecido para no romper si el servidor devuelve algo raro (string,
+    # número, null) tras un cambio de API.
+    if isinstance(payload, list):
+        candidates = payload
+    elif isinstance(payload, dict):
+        candidates = payload.get("results") or []
+    else:
+        candidates = []
+    if not isinstance(candidates, list) or not candidates:
         cache_set(CACHE, key, None)
         return None
     top = candidates[0]
+    if not isinstance(top, dict):
+        cache_set(CACHE, key, None)
+        return None
     result = {
         "lat": top.get("lat"),
         "lon": top.get("lng") or top.get("lon"),

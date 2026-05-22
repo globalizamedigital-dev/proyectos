@@ -15,6 +15,7 @@ import html
 import json
 import re
 import sys
+import threading
 import time
 import urllib.parse
 from pathlib import Path
@@ -26,16 +27,36 @@ from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observ
 CACHE = CacheConfig(namespace="ddg", ttl_seconds=60 * 60 * 24 * 7)
 DDG_HTML = "https://html.duckduckgo.com/html/?q={q}"
 
+# UA realista de Chrome: el UA antiguo "norteia-lead-recon/0.1" se delataba
+# como bot y DDG redirige a verificación CAPTCHA.
+_DDG_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
+
+# Marcadores del HTML de bloqueo anti-bot de DDG.
+_DDG_BLOCK_MARKERS = (
+    "anomaly-modal",
+    "unfortunately, bots",
+    "/sorry/",
+)
+
 _LAST_REQ_TS: float = 0.0
 _RATE_LIMIT_SECONDS = 2.0
+# Lock para el rate-limiter global: _LAST_REQ_TS es estado mutable compartido
+# entre threads (el GUI llama a DDG desde workers). Sin lock, dos threads
+# podrían leer el mismo valor y disparar dos requests simultáneos a DDG.
+_THROTTLE_LOCK = threading.Lock()
 
 
 def _throttle() -> None:
     global _LAST_REQ_TS
-    delta = time.time() - _LAST_REQ_TS
-    if delta < _RATE_LIMIT_SECONDS:
-        time.sleep(_RATE_LIMIT_SECONDS - delta)
-    _LAST_REQ_TS = time.time()
+    with _THROTTLE_LOCK:
+        delta = time.time() - _LAST_REQ_TS
+        if delta < _RATE_LIMIT_SECONDS:
+            time.sleep(_RATE_LIMIT_SECONDS - delta)
+        _LAST_REQ_TS = time.time()
 
 
 def search(query: str, max_results: int = 10) -> list[dict]:
@@ -53,12 +74,19 @@ def search(query: str, max_results: int = 10) -> list[dict]:
 
     _throttle()
     url = DDG_HTML.format(q=urllib.parse.quote(query))
-    status, body = http_get(url, timeout=15, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) norteia-lead-recon/0.1",
-    })
-    if status != 200 or "result__a" not in body:
+    status, body = http_get(url, timeout=15, headers={"User-Agent": _DDG_UA})
+    if status != 200:
         SourceStatus.mark("DDG", f"http-{status}")
         emit_observation("source_unavailable", {"source": "DDG", "status": status})
+        return []
+    # 200 con reto anti-bot: no hay resultados parseables.
+    body_lower = body.lower()
+    if any(m in body_lower for m in _DDG_BLOCK_MARKERS):
+        SourceStatus.mark("DDG", "captcha")
+        emit_observation("source_unavailable", {"source": "DDG", "status": "captcha"})
+        return []
+    if "result__a" not in body:
+        SourceStatus.mark("DDG", "no-results-class")
         return []
 
     SourceStatus.mark("DDG", "ok")

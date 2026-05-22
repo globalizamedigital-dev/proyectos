@@ -431,6 +431,10 @@ def send_email(to: str, subject: str, body: str, config: dict) -> bool:
     else:
         msg.attach(MIMEText(body, "plain", "utf-8"))
 
+    # try/finally garantiza cierre de la conexión SMTP incluso si salta una
+    # excepción no SMTP (timeout de socket, KeyboardInterrupt, etc.). Antes,
+    # solo se cerraba en las ramas except específicas y el happy-path, con
+    # lo que cualquier OSError dejaba el socket colgando.
     server = None
     try:
         if use_ssl:
@@ -442,33 +446,29 @@ def send_email(to: str, subject: str, body: str, config: dict) -> bool:
 
         server.login(smtp_user, smtp_password)
         server.sendmail(from_email, to, msg.as_string())
-        server.quit()
 
         emit_observation("outreach", {"action": "email_sent", "to": to, "subject": subject})
         return True
 
     except smtplib.SMTPAuthenticationError as e:
-        _safe_quit(server)
         raise ValueError(f"Error de autenticación SMTP: {e}")
     except smtplib.SMTPRecipientsRefused as e:
         # Destinatario rechazado — hard bounce
-        _safe_quit(server)
         mark_bounced(to)
         raise RuntimeError(f"Destinatario rechazado (hard bounce): {e}")
     except smtplib.SMTPSenderRefused as e:
-        _safe_quit(server)
         raise RuntimeError(f"Remitente rechazado por el servidor SMTP: {e}")
     except smtplib.SMTPDataError as e:
         # Errores 5xx en la fase DATA suelen indicar rechazo permanente
-        _safe_quit(server)
         code = getattr(e, "smtp_code", 0)
         if isinstance(code, int) and 500 <= code < 600:
             mark_bounced(to)
             raise RuntimeError(f"Rechazo permanente 5xx (hard bounce): {e}")
         raise RuntimeError(f"Error SMTP en DATA: {e}")
     except smtplib.SMTPException as e:
-        _safe_quit(server)
         raise RuntimeError(f"Error SMTP al enviar: {e}")
+    finally:
+        _safe_quit(server)
 
 
 def _safe_quit(server) -> None:

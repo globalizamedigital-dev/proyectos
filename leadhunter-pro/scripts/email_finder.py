@@ -36,7 +36,10 @@ CACHE = CacheConfig(namespace="email-finder", ttl_seconds=60 * 60 * 24 * 3)
 CACHE_SMTP = CacheConfig(namespace="smtp-verify", ttl_seconds=60 * 60 * 24 * 7)
 
 # Timeout para conexiones SMTP
-SMTP_TIMEOUT = 8
+# Timeout SMTP por intento (segundos). Bajado de 8→5: con 8 cada email no
+# verificable bloquea ~10s (handshake + EHLO + MAIL FROM + RCPT TO), lo que
+# convierte el enriquecimiento de 20 leads en >3 min de espera.
+SMTP_TIMEOUT = 5
 
 
 def get_mx_record(domain: str) -> Optional[str]:
@@ -104,6 +107,7 @@ def verify_email_smtp(email: str, from_addr: str = "verify@leadhunter.pro") -> d
         cache_set(CACHE_SMTP, cache_key, result)
         return result
 
+    smtp: Optional[smtplib.SMTP] = None
     try:
         # Conectar al servidor MX en puerto 25
         smtp = smtplib.SMTP(timeout=SMTP_TIMEOUT)
@@ -112,7 +116,6 @@ def verify_email_smtp(email: str, from_addr: str = "verify@leadhunter.pro") -> d
         # EHLO
         code, msg = smtp.ehlo("leadhunter-verify.local")
         if code not in (200, 220, 250):
-            smtp.quit()
             result = {"valid": False, "method": "smtp", "code": code, "mx_host": mx_host,
                       "error": f"ehlo-failed-{code}"}
             cache_set(CACHE_SMTP, cache_key, result)
@@ -121,7 +124,6 @@ def verify_email_smtp(email: str, from_addr: str = "verify@leadhunter.pro") -> d
         # MAIL FROM (simulado)
         code, msg = smtp.mail(from_addr)
         if code not in (200, 250):
-            smtp.quit()
             result = {"valid": False, "method": "smtp", "code": code, "mx_host": mx_host,
                       "error": f"mail-from-failed-{code}"}
             cache_set(CACHE_SMTP, cache_key, result)
@@ -129,8 +131,6 @@ def verify_email_smtp(email: str, from_addr: str = "verify@leadhunter.pro") -> d
 
         # RCPT TO — la clave de la verificación
         code, msg = smtp.rcpt(email)
-        smtp.quit()
-
         valid = code in (200, 250, 251)
         result = {
             "valid": valid,
@@ -154,6 +154,17 @@ def verify_email_smtp(email: str, from_addr: str = "verify@leadhunter.pro") -> d
         result = {"valid": False, "method": "smtp", "error": f"os-error:{e}", "mx_host": mx_host}
     except Exception as e:
         result = {"valid": False, "method": "smtp", "error": f"smtp-error:{type(e).__name__}", "mx_host": mx_host}
+    finally:
+        # Cierre garantizado de la conexión: smtp.quit() puede a su vez fallar
+        # si el servidor ya cortó, así que cubrimos con close() de respaldo.
+        if smtp is not None:
+            try:
+                smtp.quit()
+            except Exception:
+                try:
+                    smtp.close()
+                except Exception:
+                    pass
 
     cache_set(CACHE_SMTP, cache_key, result)
     return result

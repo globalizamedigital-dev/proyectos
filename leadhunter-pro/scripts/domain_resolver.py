@@ -42,8 +42,13 @@ def slugify(razon_social: str) -> str:
 
 
 def head_check(url: str) -> tuple[bool, int]:
-    """Returns (ok, status). Considers 200-399 as ok."""
-    status, _ = http_get(url, timeout=10)
+    """Returns (ok, status). Considers 200-399 as ok.
+
+    retries=1 a propósito: probamos hasta 5 candidatos de dominio por lead
+    (slug.es/.com/.net + variantes www), y con retries=3 cada dominio muerto
+    costaba ~10s × 3 ≈ 30s. En el enriquecimiento de discover esto sumaba
+    minutos. Un único intento es suficiente para decidir si existe."""
+    status, _ = http_get(url, timeout=6, retries=1)
     return 200 <= status < 400, status
 
 

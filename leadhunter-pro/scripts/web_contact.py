@@ -108,10 +108,18 @@ def _extract_emails(html: str, domain: str) -> list[dict]:
         if email_domain in EMAIL_BLACKLIST_DOMAINS:
             continue
 
-        # Clasificar confianza
+        # Clasificar confianza. Normalizamos ambos lados: el regex de email
+        # ya devuelve lowercase, pero `domain` viene del adapter de origen y
+        # puede traer mayúsculas o www. El rstrip("/") era inútil (un email
+        # nunca termina en barra); lo dejamos por seguridad junto al lower().
+        norm_email_domain = email_domain.lower().rstrip("/").removeprefix("www.")
+        norm_domain = (domain or "").lower().removeprefix("www.")
         confidence = "low"
-        if email_domain.rstrip("/").replace("www.", "") == domain.replace("www.", ""):
-            confidence = "high"  # Email del mismo dominio
+        if norm_domain and (
+            norm_email_domain == norm_domain
+            or norm_email_domain.endswith("." + norm_domain)
+        ):
+            confidence = "high"  # Email del mismo dominio (o subdominio)
         elif any(email.startswith(ind) for ind in COMPANY_EMAIL_INDICATORS):
             confidence = "medium"
 

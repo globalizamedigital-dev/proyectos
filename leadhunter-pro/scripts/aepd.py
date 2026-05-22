@@ -23,8 +23,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observation, http_get, normalize_nif
 
 CACHE = CacheConfig(namespace="aepd", ttl_seconds=60 * 60 * 24 * 30)
-AEPD_SEARCH = "https://www.aepd.es/dpd/buscar.html?nif={nif}"
-AEPD_SEARCH_NAME = "https://www.aepd.es/dpd/buscar.html?razon_social={name}"
+# La AEPD migró el buscador de DPO entre 2024-2026. Probamos en orden:
+#   1) URL clásica (www.aepd.es/dpd/buscar.html) — devuelve 404 hoy pero la
+#      mantenemos por si la AEPD la restaura.
+#   2) Nueva sede electrónica (sedeaepd.gob.es) — actualmente es una SPA
+#      Angular renderizada en cliente; sin Playwright el HTML no contiene
+#      datos. Si detectamos esto, marcamos `js-spa` y degradamos limpio.
+AEPD_ENDPOINTS_NIF = [
+    "https://www.aepd.es/dpd/buscar.html?nif={nif}",
+    "https://sedeaepd.gob.es/sede-electronica/dpd/buscar?nif={nif}",
+]
+AEPD_ENDPOINTS_NAME = [
+    "https://www.aepd.es/dpd/buscar.html?razon_social={name}",
+    "https://sedeaepd.gob.es/sede-electronica/dpd/buscar?razon_social={name}",
+]
+# Marcadores de "shell SPA": página vacía o que solo carga JS bundles.
+_SPA_MARKERS = ("chunk-", "<app-root", "ng-version", "id=\"app\"")
+_AEPD_MIN_BODY = 1500
 
 
 def lookup_dpo(nif: Optional[str] = None, razon_social: Optional[str] = None) -> dict:
@@ -47,11 +62,13 @@ def lookup_dpo(nif: Optional[str] = None, razon_social: Optional[str] = None) ->
         nif = normalize_nif(nif)
         cache_key = f"nif:{nif}"
         method = "nif"
-        url = AEPD_SEARCH.format(nif=urllib.parse.quote(nif))
+        endpoints = [u.format(nif=urllib.parse.quote(nif)) for u in AEPD_ENDPOINTS_NIF]
+        needle = nif
     elif razon_social:
         cache_key = f"name:{razon_social}"
         method = "razon-social"
-        url = AEPD_SEARCH_NAME.format(name=urllib.parse.quote(razon_social))
+        endpoints = [u.format(name=urllib.parse.quote(razon_social)) for u in AEPD_ENDPOINTS_NAME]
+        needle = razon_social
     else:
         return {"registered": False, "source": None, "method": None, "error": "missing-input"}
 
@@ -59,28 +76,40 @@ def lookup_dpo(nif: Optional[str] = None, razon_social: Optional[str] = None) ->
     if cached is not None:
         return cached
 
-    status, body = http_get(url, timeout=15)
-    if status not in (200, 302):
-        SourceStatus.mark("AEPD", f"http-{status}")
-        emit_observation("source_unavailable", {"source": "AEPD", "status": status})
-        result = {"registered": False, "source": None, "method": method, "error": f"http-{status}"}
+    # Probar endpoints en orden; nos quedamos con la primera respuesta útil.
+    last_status: int = 0
+    last_url = endpoints[0]
+    for url in endpoints:
+        status, body = http_get(url, timeout=15)
+        last_status, last_url = status, url
+        if status not in (200, 302):
+            continue
+        # Detectar shell SPA: 200 con contenido inútil para scraping plano.
+        if len(body) < _AEPD_MIN_BODY or any(m in body for m in _SPA_MARKERS):
+            SourceStatus.mark("AEPD", "js-spa")
+            emit_observation("source_unavailable", {"source": "AEPD", "status": "js-spa", "url": url})
+            continue
+        SourceStatus.mark("AEPD", "ok")
+        found = needle.upper() in body.upper()
+        result = {
+            "registered": found,
+            "source": "AEPD" if found else None,
+            "method": method,
+            "url": url,
+        }
         cache_set(CACHE, cache_key, result)
         return result
 
-    SourceStatus.mark("AEPD", "ok")
-    # Heuristic detection: AEPD search results page mentions "resultados encontrados"
-    # or contains a table of DPOs. If query string text appears in body, likely match.
-    found = False
-    if nif and nif in body.upper():
-        found = True
-    if razon_social and razon_social.lower() in body.lower():
-        found = True
-
+    # Ningún endpoint dio respuesta scrapeable.
+    SourceStatus.mark("AEPD", f"endpoint-changed-http-{last_status}")
+    emit_observation("source_unavailable", {"source": "AEPD", "status": last_status})
     result = {
-        "registered": found,
-        "source": "AEPD" if found else None,
+        "registered": False,
+        "source": None,
         "method": method,
-        "url": url,
+        "error": "endpoint-changed",
+        "note": "AEPD migró a SPA en sedeaepd.gob.es; lookup plano no soportado.",
+        "url": last_url,
     }
     cache_set(CACHE, cache_key, result)
     return result

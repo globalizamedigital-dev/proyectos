@@ -17,7 +17,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
+
+# Timeout total para las dos pasadas en paralelo (recolección y enriquecimiento).
+# Si una fuente externa se queda colgada, no queremos que tumbe el análisis
+# entero: cuando se agota el tiempo, marcamos las pendientes como timeout y
+# seguimos con lo recogido.
+_PARALLEL_TIMEOUT_SECONDS = 60
 from pathlib import Path
 from typing import Any, Optional
 
@@ -98,7 +104,22 @@ def analyze(input_str: str, premium: bool = False) -> dict:
         except ImportError:
             pass
 
-        for fut in as_completed(futures):
+        try:
+            iterator = as_completed(futures, timeout=_PARALLEL_TIMEOUT_SECONDS)
+        except TypeError:
+            # Compat por si as_completed en alguna versión no acepta timeout=
+            iterator = as_completed(futures)
+        try:
+            completed_futures = list(iterator)
+        except FuturesTimeoutError:
+            # Marcamos las pendientes y nos quedamos con las completadas.
+            completed_futures = [f for f in futures if f.done()]
+            for f, src in futures.items():
+                if not f.done():
+                    emit_observation("source_unavailable", {"source": src, "error": "timeout"})
+                    payload["warnings"].append(f"{src}: timeout en pipeline paralelo")
+                    f.cancel()
+        for fut in completed_futures:
             src = futures[fut]
             try:
                 result = fut.result()
@@ -180,7 +201,15 @@ def analyze(input_str: str, premium: bool = False) -> dict:
                 except ImportError:
                     pass
 
-            for fut in as_completed(enrich_futures):
+            try:
+                completed = list(as_completed(enrich_futures, timeout=_PARALLEL_TIMEOUT_SECONDS))
+            except FuturesTimeoutError:
+                completed = [f for f in enrich_futures if f.done()]
+                for f, src in enrich_futures.items():
+                    if not f.done():
+                        payload["warnings"].append(f"{src}: timeout en enriquecimiento")
+                        f.cancel()
+            for fut in completed:
                 src = enrich_futures[fut]
                 try:
                     result = fut.result()

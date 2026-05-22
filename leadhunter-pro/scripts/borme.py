@@ -104,6 +104,22 @@ def fetch_act_xml(url_xml: str) -> Optional[str]:
     return body
 
 
+def _is_real_person_name(text: str) -> bool:
+    """Reusa el filtro de person_finder para descartar texto que parece
+    administrativo pero no es un nombre humano (cargos sueltos, secciones
+    enteras del BORME, frases tipo "El Consejo de Administración")."""
+    try:
+        from person_finder import _looks_like_person_name
+        return _looks_like_person_name(text)
+    except Exception:
+        # Fallback mínimo si person_finder no es importable: 2-5 palabras
+        # capitalizadas, sin números ni símbolos.
+        words = (text or "").strip().split()
+        if not (2 <= len(words) <= 5):
+            return False
+        return all(w[:1].isupper() and w.replace("-", "").isalpha() for w in words)
+
+
 def extract_admins_from_act_xml(xml_text: str) -> list[str]:
     """
     Extrae nombres de administradores/representantes del XML de un acto BORME.
@@ -132,10 +148,10 @@ def extract_admins_from_act_xml(xml_text: str) -> list[str]:
                 # Buscar sub-elementos con nombre
                 for sub in el:
                     texto = (sub.text or "").strip()
-                    if texto and len(texto) > 3:
+                    if texto and _is_real_person_name(texto):
                         nombre = texto
                         break
-            if nombre and len(nombre) > 3:
+            if _is_real_person_name(nombre):
                 admins.append(nombre)
 
     # Si no hay tags específicos, buscar en texto general
@@ -157,8 +173,9 @@ def _extract_admins_regex(text: str) -> list[str]:
     ]
     found = []
     for patron in patrones:
-        matches = re.findall(patron, text, re.IGNORECASE)
-        found.extend(matches)
+        for match in re.findall(patron, text, re.IGNORECASE):
+            if _is_real_person_name(match):
+                found.append(match)
     return list(dict.fromkeys(found))
 
 
