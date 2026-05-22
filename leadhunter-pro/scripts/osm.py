@@ -23,7 +23,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observation, http_get
 
 CACHE = CacheConfig(namespace="osm", ttl_seconds=60 * 60 * 24 * 7)
-OVERPASS_URL = "https://overpass-api.de/api/interpreter?data={query}"
+# Endpoints Overpass en orden de preferencia. Si el primero falla (timeout,
+# 406, 5xx) se prueba el siguiente. overpass-api.de aplica WAF que puede
+# devolver 406 a /api/interpreter desde algunas redes; los mirrors son fallback.
+OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter?data={query}",
+    "https://overpass.kumi.systems/api/interpreter?data={query}",
+    "https://overpass.private.coffee/api/interpreter?data={query}",
+]
 
 # Bounding boxes aproximadas para las 50 provincias españolas.
 # Formato: (sur, oeste, norte, este) WGS84
@@ -173,8 +180,17 @@ def query_overpass(tag: str, bbox: tuple[float, float, float, float], timeout: i
         k, v = tag.split("=", 1)
         ql = f'[out:json][timeout:{timeout}];(node["{k}"="{v}"]({s},{w},{n},{e});way["{k}"="{v}"]({s},{w},{n},{e});relation["{k}"="{v}"]({s},{w},{n},{e}););out center tags;'
 
-    url = OVERPASS_URL.format(query=urllib.parse.quote(ql))
-    status, body = http_get(url, timeout=timeout + 5)
+    encoded = urllib.parse.quote(ql)
+    status, body = 0, ""
+    for endpoint in OVERPASS_ENDPOINTS:
+        url = endpoint.format(query=encoded)
+        # retries=1: no reintentar el mismo mirror; ya hay 3 mirrors de fallback.
+        status, body = http_get(url, timeout=timeout + 5, retries=1)
+        if status == 200:
+            break
+        emit_observation("source_retry", {
+            "source": "OSM-Overpass", "endpoint": endpoint.split("/api/")[0], "status": status,
+        })
     if status != 200:
         SourceStatus.mark("OSM", f"http-{status}")
         emit_observation("source_unavailable", {"source": "OSM-Overpass", "status": status})

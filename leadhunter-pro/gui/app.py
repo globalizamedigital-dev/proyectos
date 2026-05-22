@@ -200,7 +200,7 @@ class IconButton(tk.Button):
     def __init__(self, parent, text, command=None, style="primary", **kwargs):
         bg = COLORS["button_bg"] if style == "primary" else COLORS["border"]
         fg = COLORS["button_fg"] if style == "primary" else COLORS["text"]
-        super().__init__(parent,
+        opts = dict(
             text=text,
             command=command,
             bg=bg,
@@ -213,8 +213,9 @@ class IconButton(tk.Button):
             font=("Segoe UI", 10, "bold"),
             padx=14,
             pady=7,
-            **kwargs
         )
+        opts.update(kwargs)  # kwargs del caller sobrescriben los defaults
+        super().__init__(parent, **opts)
 
 
 class SpinnerLabel(tk.Label):

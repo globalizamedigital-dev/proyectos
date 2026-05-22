@@ -20,6 +20,16 @@ import json
 import sys
 from pathlib import Path
 
+# Forzar UTF-8 en stdout/stderr: la consola de Windows usa cp1252 por defecto
+# y crashea al imprimir caracteres como ⚠ o acentos. errors="replace" evita
+# que un carácter no representable aborte el comando.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
 # Añadir scripts/ al path
 _SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
 sys.path.insert(0, str(_SCRIPTS_DIR))

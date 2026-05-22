@@ -231,12 +231,19 @@ def scrape_contact(domain: str) -> dict:
                 continue
 
         try:
-            status, html = http_get(url, timeout=12)
+            status, html = http_get(url, timeout=12, retries=1)
         except Exception as e:
             errors.append(f"{url}: {e}")
+            if path == "/":
+                break  # homepage muerta: el resto de rutas fallarán igual
             continue
 
         if status not in (200, 301, 302):
+            # Si ni la homepage responde, el dominio está caído: abortar
+            # en vez de malgastar ~80s probando 12 sub-rutas inexistentes.
+            if path == "/":
+                errors.append(f"{url}: homepage status {status}")
+                break
             continue
 
         if not html or len(html) < 100:
