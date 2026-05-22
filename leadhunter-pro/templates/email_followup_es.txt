@@ -1,0 +1,20 @@
+Asunto: Re: {empresa} — Seguimiento (última vez que te escribo)
+
+Hola {nombre_corto},
+
+Te escribí hace unos días sobre cómo podríamos ayudar a {empresa} con la integración de IA en vuestros procesos.
+
+Entiendo que tienes la agenda a tope — por eso quiero ser breve:
+
+¿Tiene sentido para {empresa} explorar cómo la IA puede mejorar la eficiencia del equipo en {sector}?
+
+Si la respuesta es NO, te lo agradezco igualmente y no te escribo más.
+Si la respuesta es SÍ o "quizás", dime cuándo y lo organizamos.
+
+Un saludo,
+[Tu nombre]
+[Tu empresa]
+[Tu teléfono]
+
+---
+Si quieres darte de baja de mis comunicaciones, responde con "BAJA".

@@ -1,0 +1,24 @@
+Asunto: {empresa} — ¿Integramos IA en vuestro equipo?
+
+Hola {nombre_corto},
+
+He visto que {empresa}{if ciudad} en {ciudad}{endif} es una empresa referente en {sector}. Me pongo en contacto porque creo que podemos aportaros valor concreto.
+
+En los últimos meses hemos ayudado a empresas como la vuestra a:
+
+• Automatizar tareas repetitivas y liberar hasta un 30% del tiempo del equipo
+• Implementar IA de forma segura y cumpliendo con el EU AI Act
+• Conseguir una ventaja competitiva real frente a competidores que aún no han dado el paso
+
+No te pido que cambies nada todavía — solo una llamada de 15 minutos para ver si hay encaje real. Si no lo hay, te lo digo directamente.
+
+¿Tienes hueco esta semana o la próxima?
+
+Un cordial saludo,
+[Tu nombre]
+[Tu empresa]
+[Tu teléfono]
+[Tu web]
+
+---
+P.D.: Si prefieres que no me ponga en contacto de nuevo, responde con "BAJA" y lo respeto sin problema.

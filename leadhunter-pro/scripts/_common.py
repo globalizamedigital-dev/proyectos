@@ -28,6 +28,7 @@ SKILL_DIR = Path(__file__).resolve().parent.parent
 CACHE_ROOT = HOME / ".cache" / "leadhunter-pro"
 OBSERVATIONS_PATH = HOME / ".cache" / "leadhunter-pro" / "observations.jsonl"
 DATA_DIR = HOME / ".cache" / "leadhunter-pro" / "data"
+OPERATOR_STATE_PATH = HOME / ".cache" / "leadhunter-pro" / "state.json"
 
 
 def today_dir() -> Path:
@@ -399,6 +400,31 @@ def province_code(name: str) -> Optional[str]:
         if normalize_razon_social(k) == norm:
             return v
     return None
+
+
+# ---------------------------------------------------------------------------
+# Operator state read/write
+
+def read_operator_state() -> dict:
+    if not OPERATOR_STATE_PATH.exists():
+        return {}
+    try:
+        return json.loads(OPERATOR_STATE_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def update_operator_state_section(section: str, value: Any) -> bool:
+    """Fusiona `value` en la sección `section` del estado. Idempotente."""
+    OPERATOR_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    state = read_operator_state()
+    state[section] = value
+    state["lastUpdated"] = now_iso()
+    OPERATOR_STATE_PATH.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return True
 
 
 # ---------------------------------------------------------------------------
