@@ -20,6 +20,12 @@
 # DNS para verificación SMTP más robusta (fallback a socket si no está).
 dnspython>=2.4.0
 
+# --- Scrapling: TLS fingerprint + browser stealth para fuentes con WAF ---
+# Sprint 1 (T040): bypassa anti-bot en DDG, InfoEmpresa, Overpass y renderiza
+# SPAs como sedeAEPD. Sin esto, los adapters caen a urllib via feature flag
+# `LEADHUNTER_USE_SCRAPLING=false`.
+scrapling[fetchers]>=0.4
+
 # Exportación a Excel .xlsx además de CSV (CSV funciona sin esto).
 openpyxl>=3.1.0
 

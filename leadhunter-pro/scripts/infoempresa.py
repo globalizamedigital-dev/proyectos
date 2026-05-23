@@ -24,6 +24,7 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observation, http_get, normalize_razon_social
+from fetch_client import fetch_stealthy
 
 CACHE = CacheConfig(namespace="infoempresa", ttl_seconds=60 * 60 * 24 * 7)
 
@@ -213,7 +214,7 @@ def search(query: str, max_results: int = 5) -> list[dict]:
         return cached
 
     url = INFOEMPRESA_SEARCH.format(query=urllib.parse.quote(query))
-    status, body = http_get(url, timeout=20)
+    status, body = fetch_stealthy(url, timeout=20)
 
     if status != 200:
         SourceStatus.mark("InfoEmpresa", f"http-{status}")
@@ -281,7 +282,7 @@ def lookup(razon_social: Optional[str] = None, nif: Optional[str] = None) -> dic
     if nif:
         nif_upper = nif.strip().upper()
         url = INFOEMPRESA_NIF.format(nif=nif_upper)
-        status, body = http_get(url, timeout=20)
+        status, body = fetch_stealthy(url, timeout=20)
         if status == 200 and len(body) > _INFOEMPRESA_MIN_BODY:
             result = _parse_company_page(body, url)
             if result.get("razonSocial") or result.get("nif"):
@@ -301,7 +302,7 @@ def lookup(razon_social: Optional[str] = None, nif: Optional[str] = None) -> dic
             slug = _slugify(razon_social)
             if slug:
                 url = INFOEMPRESA_COMPANY.format(slug=slug)
-                status, body = http_get(url, timeout=20)
+                status, body = fetch_stealthy(url, timeout=20)
                 if status == 200 and len(body) > 500:
                     result = _parse_company_page(body, url)
                     if result.get("razonSocial"):
@@ -315,7 +316,7 @@ def lookup(razon_social: Optional[str] = None, nif: Optional[str] = None) -> dic
         # Tomar el primer resultado y hacer lookup completo
         first = search_results[0]
         url = first["url"]
-        status, body = http_get(url, timeout=20)
+        status, body = fetch_stealthy(url, timeout=20)
         if status == 200:
             result = _parse_company_page(body, url)
             SourceStatus.mark("InfoEmpresa", "ok")

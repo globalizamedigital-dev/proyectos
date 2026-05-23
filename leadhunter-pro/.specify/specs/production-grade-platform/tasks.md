@@ -17,7 +17,7 @@
 
 Sin estos 5, Sprint 0 no arranca. Son todos one-off, externos al repo.
 
-- [ ] **[T001][OP]** Crear proyecto Supabase `globalizame-cazador` en https://supabase.com — región **eu-central-1 Frankfurt**, plan **Free**, password de DB guardado en 1Password.
+- [x] **[T001][OP]** Crear proyecto Supabase `globalizame-cazador` en https://supabase.com — región **eu-central-1 Frankfurt**, plan **Free**, password de DB guardado en 1Password.
 - [ ] **[T002][OP]** En el proyecto recién creado, copiar `Project URL`, `anon key`, `service_role key` y `project ref`. Anotar para Sprint 0.
 - [ ] **[T003][OP]** Generar API key Gemini en https://aistudio.google.com → guardar como `GEMINI_API_KEY` en 1Password.
 - [ ] **[T004][OP]** Confirmar SMTP demo de Globalizame: o bien Hostinger del dominio `globalizame.com`, o bien Gmail con App Password. Anotar host, port, user, pass.
@@ -29,35 +29,35 @@ Sin estos 5, Sprint 0 no arranca. Son todos one-off, externos al repo.
 
 ### 1.A · Infraestructura local
 
-- [ ] **[T010][CL]** Crear `.env.example` raíz con todas las claves consolidadas y placeholders comentados. Path: `proyectos/leadhunter-pro/.env.example`
-- [ ] **[T011][CL]** Crear `web/.env.local.example` con `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `API_BASE_URL`. Path: `web/.env.local.example`
-- [ ] **[T012][CL]** Añadir `.env*` real al `.gitignore` raíz si no está. Path: `proyectos/leadhunter-pro/.gitignore`
+- [x] **[T010][CL]** Crear `.env.example` raíz con todas las claves consolidadas y placeholders comentados. Path: `proyectos/leadhunter-pro/.env.example`
+- [x] **[T011][CL]** Crear `web/.env.local.example` con `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `API_BASE_URL`. Path: `web/.env.local.example`
+- [x] **[T012][CL]** Añadir `.env*` real al `.gitignore` raíz si no está. Path: `proyectos/leadhunter-pro/.gitignore`
 
 ### 1.B · Migraciones Supabase
 
-- [ ] **[T013][CL]** `supabase/migrations/0001_init_tenants.sql` — tablas `tenants`, `tenant_members`, función `current_tenant_id()`.
-- [ ] **[T014][CL]** `supabase/migrations/0002_leads.sql` — tabla `leads` con `dedup_key`, `score`, `grade`, JSONB `data`, índices por `nif`, `score`, `provincia`, `outreach_status`.
-- [ ] **[T015][CL]** `supabase/migrations/0003_outreach.sql` — tablas `outreach_events`, `outreach_templates`, `outreach_sequences`.
-- [ ] **[T016][CL]** `supabase/migrations/0004_suppression.sql` — tabla `suppression` con clave compuesta `(tenant_id, channel, identifier)` y trigger de uppercase en NIF.
-- [ ] **[T017][CL]** `supabase/migrations/0005_usage_events.sql` — tabla `usage_events` para Gemini y Meta WA.
-- [ ] **[T018][CL]** `supabase/migrations/0006_pgvector.sql` — `CREATE EXTENSION vector` + tabla `leads_embeddings (lead_id, embedding vector(768))`.
-- [ ] **[T019][CL]** `supabase/migrations/0007_rls.sql` — políticas RLS para todas las tablas anteriores: `tenant_members.user_id = auth.uid()`.
-- [ ] **[T020][CL]** `supabase/seed.sql` — un tenant demo "Globalizame" con `slug=globalizame`.
-- [ ] **[T021][CL]** Aplicar migraciones al proyecto Supabase nuevo usando `mcp__supabase__apply_migration` una por una (ID = nombre del archivo sin extensión).
-- [ ] **[T022][CL]** Aplicar seed con `mcp__supabase__execute_sql`. Verificar con `list_tables`.
-- [ ] **[T023][CL]** Lanzar `mcp__supabase__get_advisors` (security + performance) y arreglar warnings antes de continuar.
+- [x] **[T013][CL]** `supabase/migrations/0001_init_tenants.sql` — tablas `tenants`, `tenant_members`, función `current_tenant_id()`.
+- [x] **[T014][CL]** `supabase/migrations/0002_leads.sql` — tabla `leads` con `dedup_key`, `score`, `grade`, JSONB `data`, índices por `nif`, `score`, `provincia`, `outreach_status`.
+- [x] **[T015][CL]** `supabase/migrations/0003_outreach.sql` — tablas `outreach_events`, `outreach_templates`, `outreach_sequences`.
+- [x] **[T016][CL]** `supabase/migrations/0004_suppression.sql` — tabla `suppression` con clave compuesta `(tenant_id, channel, identifier)` y trigger de uppercase en NIF.
+- [x] **[T017][CL]** `supabase/migrations/0005_usage_events.sql` — tabla `usage_events` para Gemini y Meta WA.
+- [x] **[T018][CL]** `supabase/migrations/0006_pgvector.sql` — `CREATE EXTENSION vector` + tabla `leads_embeddings (lead_id, embedding vector(768))`.
+- [x] **[T019][CL]** `supabase/migrations/0007_rls.sql` — políticas RLS para todas las tablas anteriores: `tenant_members.user_id = auth.uid()`.
+- [x] **[T020][CL]** `supabase/seed.sql` — un tenant demo "Globalizame" con `slug=globalizame`.
+- [x] **[T021][CL]** Aplicar migraciones al proyecto Supabase nuevo usando `mcp__supabase__apply_migration` una por una (ID = nombre del archivo sin extensión).
+- [x] **[T022][CL]** Aplicar seed con `mcp__supabase__execute_sql`. Verificar con `list_tables`.
+- [x] **[T023][CL]** Lanzar `mcp__supabase__get_advisors` (security + performance) y arreglar warnings antes de continuar.
 
 ### 1.C · Cliente Supabase en web
 
-- [ ] **[T024][CL]** Instalar deps en web: `npm i @supabase/supabase-js @supabase/ssr zod @tanstack/react-table`. Path: `web/package.json`
-- [ ] **[T025][CL]** Crear `web/src/lib/supabase-browser.ts` — `createBrowserClient` para uso en client components.
-- [ ] **[T026][CL]** Crear `web/src/lib/supabase-server.ts` — `createServerClient` con `cookies()` de Next.
-- [ ] **[T027][CL]** Generar `web/src/lib/database.types.ts` vía `mcp__supabase__generate_typescript_types` y commitear.
+- [x] **[T024][CL]** Instalar deps en web: `npm i @supabase/supabase-js @supabase/ssr zod @tanstack/react-table`. Path: `web/package.json`
+- [x] **[T025][CL]** Crear `web/src/lib/supabase-browser.ts` — `createBrowserClient` para uso en client components.
+- [x] **[T026][CL]** Crear `web/src/lib/supabase-server.ts` — `createServerClient` con `cookies()` de Next.
+- [x] **[T027][CL]** Generar `web/src/lib/database.types.ts` vía `mcp__supabase__generate_typescript_types` y commitear.
 
 ### 1.D · CI/CD
 
-- [ ] **[T028][CL]** Crear `.github/workflows/ci.yml` con jobs: `lint-web` (eslint), `typecheck-web` (tsc), `test-python` (pytest), `lint-python` (ruff). Path filters por workspace.
-- [ ] **[T029][CL]** Crear `.github/workflows/deploy.yml` con triggers `push: main` y jobs separados deploy-web (Vercel) + deploy-api (Cloud Run, placeholder hasta Sprint 2).
+- [x] **[T028][CL]** Crear `.github/workflows/ci.yml` con jobs: `lint-web` (eslint), `typecheck-web` (tsc), `test-python` (pytest), `lint-python` (ruff). Path filters por workspace.
+- [x] **[T029][CL]** Crear `.github/workflows/deploy.yml` con triggers `push: main` y jobs separados deploy-web (Vercel) + deploy-api (Cloud Run, placeholder hasta Sprint 2).
 - [ ] **[T030][OP]** Conectar el repo a Vercel (importar `web/` como root), añadir env vars en dashboard.
 
 ---
@@ -66,19 +66,19 @@ Sin estos 5, Sprint 0 no arranca. Son todos one-off, externos al repo.
 
 ### 2.A · Setup
 
-- [ ] **[T040][CL]** Añadir `scrapling>=0.2`, `playwright>=1.40` y `google-generativeai>=0.8` a `proyectos/leadhunter-pro/requirements.txt`.
-- [ ] **[T041][CL]** Crear `scripts/fetch_client.py` con tres funciones: `fetch_plain(url, **kw) -> (int, str)`, `fetch_stealthy(url, **kw) -> (int, str)`, `fetch_dynamic(url, wait_for=None, **kw) -> (int, str)`. Misma firma que `http_get` actual.
-- [ ] **[T042][CL]** Feature flag `LEADHUNTER_USE_SCRAPLING=true` en `_common.py` para permitir rollback rápido a urllib.
-- [ ] **[T043][CL]** Crear `tests/test_fetch_client.py` con tests mockeados para los 3 modos.
+- [x] **[T040][CL]** Añadir `scrapling>=0.2`, `playwright>=1.40` y `google-generativeai>=0.8` a `proyectos/leadhunter-pro/requirements.txt`.
+- [x] **[T041][CL]** Crear `scripts/fetch_client.py` con tres funciones: `fetch_plain(url, **kw) -> (int, str)`, `fetch_stealthy(url, **kw) -> (int, str)`, `fetch_dynamic(url, wait_for=None, **kw) -> (int, str)`. Misma firma que `http_get` actual.
+- [x] **[T042][CL]** Feature flag `LEADHUNTER_USE_SCRAPLING=true` en `_common.py` para permitir rollback rápido a urllib.
+- [x] **[T043][CL]** Crear `tests/test_fetch_client.py` con tests mockeados para los 3 modos.
 
 ### 2.B · Migración de adapters
 
-- [ ] **[T044][CL]** Migrar `scripts/ddg.py` para usar `fetch_stealthy`; el UA de Chrome real ya no hace falta hardcodeado.
-- [ ] **[T045][CL]** Migrar `scripts/infoempresa.py` para usar `fetch_stealthy` en los 3 endpoints. Mantener `_INFOEMPRESA_MIN_BODY` como guard.
-- [ ] **[T046][CL]** Migrar `scripts/aepd.py` para usar `fetch_dynamic` en el endpoint `sedeaepd.gob.es` (espera al selector `[data-testid="dpo-results"]` con timeout 8s).
-- [ ] **[T047][CL]** Migrar `scripts/osm.py` `query_overpass()` para usar `fetch_stealthy`. Si funciona, simplificar de 3 mirrors a 1 (overpass-api.de).
-- [ ] **[T048][CL]** Correr `python -m unittest discover -s tests` y verificar 55+ verde.
-- [ ] **[T049][CL]** Smoke `python main.py discover --geo Sevilla --sector "asesoría fiscal" --max 5` y `analyze --input "Asesoria Camen S.L."` — output esperado en `SourceStatus`: `AEPD: ok` o `endpoint-changed` documentado (no `js-spa`).
+- [x] **[T044][CL]** Migrar `scripts/ddg.py` para usar `fetch_stealthy`; el UA de Chrome real ya no hace falta hardcodeado.
+- [x] **[T045][CL]** Migrar `scripts/infoempresa.py` para usar `fetch_stealthy` en los 3 endpoints. Mantener `_INFOEMPRESA_MIN_BODY` como guard.
+- [x] **[T046][CL]** Migrar `scripts/aepd.py` para usar `fetch_dynamic` en el endpoint `sedeaepd.gob.es` (espera al selector `[data-testid="dpo-results"]` con timeout 8s).
+- [x] **[T047][CL]** Migrar `scripts/osm.py` `query_overpass()` para usar `fetch_stealthy`. Si funciona, simplificar de 3 mirrors a 1 (overpass-api.de).
+- [x] **[T048][CL]** Correr `python -m unittest discover -s tests` y verificar 55+ verde.
+- [x] **[T049][CL]** Smoke `python main.py discover --geo Sevilla --sector "asesoría fiscal" --max 5` y `analyze --input "Asesoria Camen S.L."` — output esperado en `SourceStatus`: `AEPD: ok` o `endpoint-changed` documentado (no `js-spa`).
 
 ---
 

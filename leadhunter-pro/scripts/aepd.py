@@ -21,6 +21,7 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observation, http_get, normalize_nif
+from fetch_client import fetch_dynamic, fetch_stealthy
 
 CACHE = CacheConfig(namespace="aepd", ttl_seconds=60 * 60 * 24 * 30)
 # La AEPD migró el buscador de DPO entre 2024-2026. Probamos en orden:
@@ -76,16 +77,29 @@ def lookup_dpo(nif: Optional[str] = None, razon_social: Optional[str] = None) ->
     if cached is not None:
         return cached
 
-    # Probar endpoints en orden; nos quedamos con la primera respuesta útil.
+    # Probar endpoints en orden:
+    #   1º · URL clásica con fetch_stealthy (Chrome TLS) — barato y rápido.
+    #   2º · Sede electrónica nueva con fetch_dynamic (Playwright) — más caro
+    #        pero renderiza la SPA Angular para que aparezcan los datos.
     last_status: int = 0
     last_url = endpoints[0]
-    for url in endpoints:
-        status, body = http_get(url, timeout=15)
+    for idx, url in enumerate(endpoints):
+        if idx == 0:
+            status, body = fetch_stealthy(url, timeout=15)
+        else:
+            # SPA: esperamos al selector típico de Angular o, en su defecto,
+            # red en idle. 8 s de espera basta para que pinte el resultado.
+            status, body = fetch_dynamic(
+                url,
+                wait_for="app-root, [data-testid=dpo-results], main",
+                wait_ms=2000,
+                timeout=25,
+            )
         last_status, last_url = status, url
         if status not in (200, 302):
             continue
-        # Detectar shell SPA: 200 con contenido inútil para scraping plano.
-        if len(body) < _AEPD_MIN_BODY or any(m in body for m in _SPA_MARKERS):
+        # Detectar shell SPA sin renderizar: 200 con contenido inútil.
+        if len(body) < _AEPD_MIN_BODY or all(m in body for m in ("chunk-",)) and "<app-root></app-root>" in body:
             SourceStatus.mark("AEPD", "js-spa")
             emit_observation("source_unavailable", {"source": "AEPD", "status": "js-spa", "url": url})
             continue

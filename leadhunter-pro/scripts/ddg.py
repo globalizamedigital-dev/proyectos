@@ -23,6 +23,7 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observation, http_get
+from fetch_client import fetch_stealthy
 
 CACHE = CacheConfig(namespace="ddg", ttl_seconds=60 * 60 * 24 * 7)
 DDG_HTML = "https://html.duckduckgo.com/html/?q={q}"
@@ -74,7 +75,10 @@ def search(query: str, max_results: int = 10) -> list[dict]:
 
     _throttle()
     url = DDG_HTML.format(q=urllib.parse.quote(query))
-    status, body = http_get(url, timeout=15, headers={"User-Agent": _DDG_UA})
+    # Scrapling Fetcher con impersonación TLS Chrome: bypassa el CAPTCHA
+    # que delataba a urllib aunque el UA fuera correcto. _DDG_UA se mantiene
+    # como header de respaldo para el fallback urllib.
+    status, body = fetch_stealthy(url, timeout=15, headers={"User-Agent": _DDG_UA})
     if status != 200:
         SourceStatus.mark("DDG", f"http-{status}")
         emit_observation("source_unavailable", {"source": "DDG", "status": status})

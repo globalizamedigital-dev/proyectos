@@ -21,11 +21,13 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observation, http_get
+from fetch_client import fetch_stealthy
 
 CACHE = CacheConfig(namespace="osm", ttl_seconds=60 * 60 * 24 * 7)
-# Endpoints Overpass en orden de preferencia. Si el primero falla (timeout,
-# 406, 5xx) se prueba el siguiente. overpass-api.de aplica WAF que puede
-# devolver 406 a /api/interpreter desde algunas redes; los mirrors son fallback.
+# Endpoints Overpass. Antes (commit 9cb32cb) usábamos 3 mirrors porque
+# overpass-api.de devolvía 406 a urllib (WAF detectaba Python). Con
+# fetch_stealthy (Chrome TLS fingerprint), el primary funciona, así que
+# los mirrors quedan como fallback de cortesía si overpass-api.de se cae.
 OVERPASS_ENDPOINTS = [
     "https://overpass-api.de/api/interpreter?data={query}",
     "https://overpass.kumi.systems/api/interpreter?data={query}",
@@ -185,7 +187,9 @@ def query_overpass(tag: str, bbox: tuple[float, float, float, float], timeout: i
     for endpoint in OVERPASS_ENDPOINTS:
         url = endpoint.format(query=encoded)
         # retries=1: no reintentar el mismo mirror; ya hay 3 mirrors de fallback.
-        status, body = http_get(url, timeout=timeout + 5, retries=1)
+        # fetch_stealthy: Chrome TLS fingerprint para bypassar el WAF que
+        # devolvía 406 a urllib en overpass-api.de.
+        status, body = fetch_stealthy(url, timeout=timeout + 5, retries=1)
         if status == 200:
             break
         emit_observation("source_retry", {
