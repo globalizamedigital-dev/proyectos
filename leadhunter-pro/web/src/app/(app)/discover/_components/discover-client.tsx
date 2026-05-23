@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Download, FileJson } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Download, FileJson, ServerCrash, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchForm, type SearchFormValues } from "./search-form";
 import { EmptyState } from "./empty-state";
 import { ResultsTable } from "./results-table";
 import { LeadDetailSheet } from "./lead-detail-sheet";
 import { MOCK_LEADS, type Lead } from "@/app/(app)/discover/_data/mock-leads";
+import { apiClient, ApiError } from "@/lib/api-client";
 
 /**
- * Orquestador cliente del Discover. Mantiene el estado de búsqueda,
- * dispara el "scrape" (mock con delay), gestiona la selección de fila
- * y los exports. Toda interacción vive aquí; el wrapper de página
- * es server component.
+ * Orquestador cliente del Discover. Llama al API real `/discover`.
+ * Si el API no está disponible (dev sin uvicorn arriba, o fallo de red)
+ * cae a un dataset mock y muestra un banner naranja para que el
+ * operador sepa que está viendo demo, no datos reales.
  */
 export function DiscoverClient() {
   const [results, setResults] = useState<Lead[] | null>(null);
@@ -21,17 +22,52 @@ export function DiscoverClient() {
   const [, startTransition] = useTransition();
   const [isSearching, setIsSearching] = useState(false);
   const [lastQuery, setLastQuery] = useState<SearchFormValues | null>(null);
+  const [error, setError] = useState<{ message: string; demoFallback: boolean } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const handleSearch = (values: SearchFormValues) => {
+  // Cancela cualquier petición en vuelo al desmontar el componente.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const handleSearch = async (values: SearchFormValues) => {
     setIsSearching(true);
     setLastQuery(values);
-    // Latencia simulada para que el shimmer del CTA tenga vida real.
-    window.setTimeout(() => {
+    setError(null);
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const payload = await apiClient.discover(
+        { geo: values.province, sector: values.sector, max: values.max, enrich: values.enrich },
+        controller.signal,
+      );
       startTransition(() => {
-        setResults([...MOCK_LEADS].slice(0, values.max));
+        // Coerción cómoda: el backend devuelve la forma camelCase ya conocida.
+        const leads = payload.candidates as unknown as Lead[];
+        setResults(leads);
         setIsSearching(false);
       });
-    }, 1100);
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      const apiErr = err instanceof ApiError ? err : null;
+      const message = apiErr
+        ? apiErr.status === 0
+          ? "El API no responde — comprobando localhost:8000…"
+          : `${apiErr.status} · ${apiErr.message}`
+        : err instanceof Error
+          ? err.message
+          : "Error desconocido";
+
+      // Fallback a mock: solo si el API está caído (status 0), no si fue
+      // 401/403/4xx que el operador debe ver.
+      const demoFallback = apiErr?.status === 0;
+      if (demoFallback) {
+        setResults([...MOCK_LEADS].slice(0, values.max));
+      }
+      setError({ message, demoFallback });
+      setIsSearching(false);
+    }
   };
 
   const downloadJSON = () => {
@@ -106,6 +142,48 @@ export function DiscoverClient() {
       </header>
 
       <SearchForm isSearching={isSearching} onSubmit={handleSearch} />
+
+      {/* Banner de error / fallback a demo */}
+      {error && (
+        <div
+          className={
+            error.demoFallback
+              ? "flex items-start gap-3 border border-[var(--warning)]/40 bg-[var(--warning)]/[0.06] px-5 py-3"
+              : "flex items-start gap-3 border border-destructive/40 bg-destructive/[0.06] px-5 py-3"
+          }
+        >
+          {error.demoFallback ? (
+            <ServerCrash className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warning)]" />
+          ) : (
+            <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          )}
+          <div className="flex-1 text-[12px] leading-relaxed">
+            <div className="label-eyebrow mb-0.5">
+              {error.demoFallback ? "modo demo · API offline" : "error"}
+            </div>
+            <div className={error.demoFallback ? "text-[var(--warning)]" : "text-destructive"}>
+              {error.message}
+            </div>
+            {error.demoFallback && (
+              <div className="mt-1 text-muted-foreground">
+                Estás viendo el dataset de ejemplo. Arranca el backend con{" "}
+                <code className="bg-muted/60 px-1 py-0.5 text-foreground">
+                  cd api && uvicorn main:app --reload
+                </code>{" "}
+                para datos reales.
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="cerrar"
+          >
+            <XCircle className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Resultados */}
       {results === null ? (

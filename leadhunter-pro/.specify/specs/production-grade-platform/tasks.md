@@ -115,14 +115,14 @@ Sin estos 5, Sprint 0 no arranca. Son todos one-off, externos al repo.
 
 ## Fase 4 · Sprint 3 · Web ↔ API real
 
-- [ ] **[T070][CL]** `web/src/lib/api-client.ts` — fetch wrapper con `Authorization: Bearer {sessionToken}` automático.
-- [ ] **[T071][CL]** `web/src/app/(auth)/login/page.tsx` — formulario magic link con marca Globalizame.
-- [ ] **[T072][CL]** `web/src/app/(auth)/callback/route.ts` — route handler para el callback Supabase.
-- [ ] **[T073][CL]** `web/src/middleware.ts` — proteger `(app)/*` con redirect a `/login` si no hay sesión.
-- [ ] **[T074][CL]** Reemplazar el `setTimeout` mock en `web/src/app/(app)/discover/_components/discover-client.tsx` por `api.discover({province, sector, max, enrich})`.
-- [ ] **[T075][CL]** Manejar errores de red en la UI: banner rojo si `api.discover` falla, mantener estado navegable.
+- [x] **[T070][CL]** `web/src/lib/api-client.ts` — fetch wrapper con `Authorization: Bearer {sessionToken}` automático.
+- [x] **[T071][CL]** `web/src/app/(auth)/login/page.tsx` — formulario magic link con marca Globalizame.
+- [x] **[T072][CL]** `web/src/app/(auth)/callback/route.ts` — route handler para el callback Supabase.
+- [x] **[T073][CL]** `web/src/middleware.ts` — proteger `(app)/*` con redirect a `/login` si no hay sesión.
+- [x] **[T074][CL]** Reemplazar el `setTimeout` mock en `web/src/app/(app)/discover/_components/discover-client.tsx` por `api.discover({province, sector, max, enrich})`.
+- [x] **[T075][CL]** Manejar errores de red en la UI: banner rojo si `api.discover` falla, mantener estado navegable.
 - [ ] **[T076][CL]** Tests E2E con Playwright en `web/tests/e2e/`: login con magic link mockeado → discover → ver leads.
-- [ ] **[T077][CL]** Ajustar `web/src/components/app-shell/status-bar.tsx` para consumir `/health/sources` vivo en lugar de mocks.
+- [x] **[T077][CL]** Ajustar `web/src/components/app-shell/status-bar.tsx` para consumir `/health/sources` vivo en lugar de mocks.
 
 ---
 
