@@ -220,13 +220,13 @@ Sin estos 5, Sprint 0 no arranca. Son todos one-off, externos al repo.
 
 ## Fase 11 · Polish y release
 
-- [ ] **[T180][CL]** `README.md` reescrito con setup completo (clonar → env vars → `npm i` web → `pip install` api → migraciones → run).
-- [ ] **[T181][CL]** `CHANGELOG.md` con versión `0.2.0 — production-grade platform MVP`, citando commits clave (`9cb32cb` auditoría, hashes de cada sprint).
-- [ ] **[T182][CL]** Error boundaries en cada pantalla `(app)/*/error.tsx` con copy en marca.
+- [x] **[T180][CL]** `README.md` reescrito con setup completo (clonar → env vars → `npm i` web → `pip install` api → migraciones → run).
+- [x] **[T181][CL]** `CHANGELOG.md` con versión `0.2.0 — production-grade platform MVP`, citando commits clave (`9cb32cb` auditoría, hashes de cada sprint).
+- [x] **[T182][CL]** Error boundaries en cada pantalla `(app)/*/error.tsx` con copy en marca.
 - [ ] **[T183][CL]** Auditoría rápida axe-core sobre las 5 pantallas; arreglar al menos los `serious`/`critical`.
 - [ ] **[T184][CL]** Smoke test producción end-to-end: login real → discover real → analyze real → outreach send a buzón de Mario → ver evento `sent` → unsubscribe → ver evento `unsubscribed` → erase GDPR.
-- [ ] **[T185][CL]** `docs/runbook.md` con: cómo desplegar, cómo revertir, qué hacer si Gemini se agota, qué hacer si Supabase está caído, dónde están los logs.
-- [ ] **[T186][CL]** Tag de release `v0.2.0-mvp` en GitHub + nota de release.
+- [x] **[T185][CL]** `docs/runbook.md` con: cómo desplegar, cómo revertir, qué hacer si Gemini se agota, qué hacer si Supabase está caído, dónde están los logs.
+- [x] **[T186][CL]** Tag de release `v0.2.0-mvp` en GitHub + nota de release.
 
 ---
 

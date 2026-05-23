@@ -1,168 +1,238 @@
 # Cazador Globalizame
 
-Motor de generación de leads B2B para el mercado español. Descubre empresas por
-sector y provincia, las enriquece con datos de fuentes públicas (BORME, PLACSP,
-Infosubvenciones, AEPD, OpenStreetMap, webs corporativas), puntúa cada lead y
-prepara campañas de outreach por email, LinkedIn y WhatsApp.
-
-> **AVISO LEGAL IMPORTANTE — léelo antes de usar la app**
+> Herramienta interna de Globalizame para generar leads B2B cualificados
+> a partir de fuentes oficiales españolas (BORME, OSM, Cartociudad,
+> PLACSP, AEPD, INE/DIRCE, Infosubvenciones).
 >
-> Esta herramienta trata datos personales y permite enviar comunicaciones
-> comerciales. En España, el envío de email comercial está regulado por la
-> **LSSI-CE (art. 21)**, el **RGPD** y la **LOPDGDD**, y **como regla general
-> requiere consentimiento previo o una base de interés legítimo documentada**.
->
-> **Antes de lanzar cualquier campaña, lee
-> [`docs/CUMPLIMIENTO_LEGAL.md`](docs/CUMPLIMIENTO_LEGAL.md)**, que incluye
-> plantillas de ROPA y de test de interés legítimo (LIA) y un checklist de
-> obligaciones legales. El uso indebido de esta herramienta es responsabilidad
-> exclusiva del usuario.
+> **No es SaaS público. No hay cobros dentro de la app.** Lo usa el
+> equipo de Globalizame para sus propios leads y para los clientes del
+> Servicio Integral (cobro vía factura clásica, no Stripe).
 
 ---
 
-## Qué hace
+## ⚖️ Aviso legal — léelo antes de usar
 
-- **Descubrir**: busca empresas por provincia + sector/CNAE y las puntúa (0-100).
-- **Analizar**: análisis completo de una empresa por NIF o razón social.
-- **Enriquecer**: resuelve dominio web, decisores, emails y teléfonos.
-- **Puntuar**: cada lead recibe un score y un grado A-D según su completitud.
-- **Outreach**: prepara y envía emails personalizados con control de
-  entregabilidad (throttle, cap diario) y de cumplimiento legal (lista de
-  supresión, baja en cada email, gestión de rebotes).
-- **Datastore**: todos los leads se guardan en una base SQLite con
-  deduplicación entre ejecuciones.
+Esta herramienta trata datos personales y permite enviar comunicaciones
+comerciales. En España, el envío de email comercial está regulado por
+la **LSSI-CE (art. 21)**, el **RGPD** y la **LOPDGDD**, y **como regla
+general requiere consentimiento previo o una base de interés legítimo
+documentada**.
+
+Antes de lanzar cualquier campaña, lee
+[`docs/CUMPLIMIENTO_LEGAL.md`](docs/CUMPLIMIENTO_LEGAL.md). Incluye
+plantillas de ROPA y test de interés legítimo (LIA), y un checklist de
+obligaciones legales. El uso indebido es responsabilidad del operador.
 
 ---
 
-## Requisitos
+## 📐 Arquitectura
 
-- **Python 3.11 o superior**.
-- La funcionalidad principal usa **solo la biblioteca estándar** — no requiere
-  instalar nada.
-- Tkinter para la GUI (en Debian/Ubuntu: `sudo apt-get install python3-tk`).
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Fuentes oficiales españolas: BORME, OSM, Cartociudad,       │
+│                               PLACSP, AEPD, INE, Infosub.    │
+└────────────────────────┬─────────────────────────────────────┘
+                         │
+                         ▼
+            ┌────────────────────────┐
+            │ scripts/ · Python 3.12 │   ←── scrapling, urllib,
+            │ adapters + parsing     │       playwright (opcional)
+            └─────────┬──────────────┘
+                      │
+        ┌─────────────┴─────────────┐
+        ▼                           ▼
+┌────────────────┐         ┌──────────────────────┐
+│ main.py CLI    │         │ api/ · FastAPI       │
+│ gui/  Tkinter  │         │ /discover /analyze   │
+│ (offline)      │         │ /privacy /health     │
+└────────────────┘         └──────────┬───────────┘
+                                      │
+                                      ▼
+                          ┌──────────────────────┐
+                          │ web/ · Next.js 16    │
+                          │ Login magic-link     │
+                          │ 5 pantallas + status │
+                          └──────────────────────┘
 
-## Instalación
+                                      ▲
+                                      │ stateful storage
+                          ┌───────────┴──────────┐
+                          │ Supabase (Frankfurt) │
+                          │ globalizame-cazador  │
+                          │ 9 tablas + RLS       │
+                          └──────────────────────┘
+```
+
+Stack 100 % free-tier hasta que un cliente pague algo concreto. Ver
+[`ARCHITECTURE.md`](ARCHITECTURE.md) para la versión larga y
+[`.specify/specs/production-grade-platform/`](.specify/specs/production-grade-platform/)
+para spec + plan + tasks.
+
+---
+
+## 🚀 Arranque rápido (local)
+
+### Requisitos
+- **Python 3.12+**
+- **Node.js 24+** y npm
+- Cuenta Supabase (proyecto `globalizame-cazador`, ya creado)
+- Browser (Chrome / Firefox) para la web
+
+### 1. Clonar y dependencias
 
 ```bash
 git clone <repo>
-cd leadhunter-pro
+cd proyectos/leadhunter-pro
 
-# (Opcional) dependencias que mejoran la funcionalidad y herramientas de build
+# Python (incluye scrapling, fastapi, supabase-py, etc.)
 pip install -r requirements.txt
+pip install fastapi "uvicorn[standard]" pydantic-settings "pyjwt[crypto]" \
+            cryptography httpx supabase python-json-logger \
+            pytest pytest-asyncio
+
+# Web
+cd web && npm install && cd ..
 ```
 
-## Configuración (.env)
+### 2. Configurar credenciales
 
-Las credenciales SMTP **nunca** se guardan dentro de la aplicación: se leen de
-un archivo `.env` que **no se versiona**.
+Hay **dos** archivos de credenciales locales, ambos gitignored:
+
+| Archivo | Para | Cómo crearlo |
+|---|---|---|
+| `proyectos/leadhunter-pro/info` | Bandeja del operador. Vas pegando claves según las consigues; sirve como fuente única de verdad. | A mano. Formato `clave: valor`. |
+| `.env` (raíz del proyecto) | Variables que lee el código Python (CLI, API). | A partir de `.env.example`. Lo rellena el operador con los valores de `info`. |
+| `web/.env.local` | Variables que lee el código Next.js (frontend). | Solo `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` + `NEXT_PUBLIC_API_BASE_URL`. |
+
+Valores mínimos para que arranque la web:
 
 ```bash
-cp .env.example .env
-# Edita .env y rellena SMTP_USER, SMTP_PASSWORD, etc.
+# .env (raíz)
+SUPABASE_URL=https://tfdjnnkgoynrkmyekusv.supabase.co
+SUPABASE_PROJECT_REF=tfdjnnkgoynrkmyekusv
+SUPABASE_ANON_KEY=<anon key>
+SUPABASE_SERVICE_ROLE_KEY=<service_role key>
+
+# web/.env.local
+NEXT_PUBLIC_SUPABASE_URL=https://tfdjnnkgoynrkmyekusv.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ```
 
-Para Gmail, usa una **Contraseña de aplicación**
-(<https://myaccount.google.com/apppasswords>), no tu contraseña habitual.
+### 3. Levantar la app
 
-Orden de búsqueda del `.env`:
-1. La ruta de la variable de entorno `LEADHUNTER_ENV`.
-2. `./.env` (directorio de trabajo).
-3. `<raíz del proyecto>/.env`.
-4. `~/.leadhunter.env`.
-
-El archivo `.env` ya está en `.gitignore`. **No lo subas nunca al repositorio.**
-
-## Uso
+Dos terminales:
 
 ```bash
-# Interfaz gráfica
-python main.py gui
+# Terminal 1 — API FastAPI (puerto 8000)
+cd api
+uvicorn main:app --reload --port 8000
 
-# Descubrir leads por provincia + sector
+# Terminal 2 — Web Next.js (puerto 3000)
+cd web
+npm run dev
+```
+
+Abre **http://localhost:3000** → redirige a `/login`. Pega el email que
+diste de alta en Supabase Auth → recibes magic link → click → entras a
+`/discover`. La búsqueda llama al API real.
+
+### 4. Dar de alta tu email para login
+
+En Supabase Studio → Authentication → Users → **Add user**.
+Email `mario@globalizame.com` (o el que sea). Después, en SQL editor:
+
+```sql
+insert into public.tenant_members (tenant_id, user_id, role)
+select t.id, u.id, 'admin'
+from public.tenants t, auth.users u
+where t.slug = 'globalizame' and u.email = 'mario@globalizame.com'
+on conflict do nothing;
+```
+
+---
+
+## 🧪 Tests
+
+```bash
+# Python (scripts + GUI)
+python -m unittest discover -s tests
+
+# API (FastAPI)
+cd api && python -m pytest tests/
+
+# Web (typecheck + build)
+cd web && npx tsc --noEmit && npm run build
+```
+
+Estado actual:
+- Python: **62/62 OK**
+- API: **14/14 OK**
+- Web build: **verde** (9 rutas)
+
+---
+
+## 📦 GUI Tkinter offline (legacy)
+
+La GUI Python sigue funcional como herramienta offline / standalone:
+
+```bash
+python main.py gui                                # ventana Tkinter
 python main.py discover --geo Sevilla --sector "asesoría fiscal"
-python main.py discover --geo Madrid --sector "desarrollo software" --max 100
-
-# Analizar una empresa por NIF o razón social
-python main.py analyze --input B12345678
-python main.py analyze --input "Asesores García S.L."
-
-# Otras utilidades
-python main.py person  --razon-social "Empresa X" --domain empresa.es
-python main.py email   --razon-social "Empresa X" --domain empresa.es
-python main.py score   --lead-file lead.json
-python main.py outreach --preview --lead-json '{...}'
+python main.py analyze --input B41234567
 python main.py version
 ```
 
-Herramientas de cumplimiento y datos (CLI directa):
-
-```bash
-# Lista de supresión (bajas / opt-out)
-python scripts/suppression.py add --email cliente@ejemplo.com
-python scripts/suppression.py check --email cliente@ejemplo.com
-python scripts/suppression.py list
-
-# Base de datos de leads
-python scripts/leads_db.py count
-python scripts/leads_db.py query --min-score 50
-
-# Estado de la configuración (sin exponer secretos)
-python scripts/config.py --status
-```
-
-## Tests
-
-```bash
-python3 -m unittest tests.test_smoke -v
-```
-
-La suite usa solo `unittest` (stdlib) y funciona **sin conexión a red**.
-
-## Construir el ejecutable Windows (.exe)
-
+Para empaquetar `.exe` Windows:
 ```bash
 pip install pyinstaller
-
-# Modo carpeta (arranque más rápido) — usa el spec incluido:
 pyinstaller leadhunter.spec
 # Resultado: dist/LeadHunterPro/LeadHunterPro.exe
-
-# Modo onefile (un único .exe, arranque más lento):
-pyinstaller --onefile --name LeadHunterPro --noconsole \
-  --add-data "mappings;mappings" --add-data "templates;templates" \
-  --add-data "docs;docs" --add-data "scripts;scripts" \
-  --add-data "gui;gui" main.py
 ```
 
-(En Linux/macOS, el separador de `--add-data` es `:` en lugar de `;`.)
+---
 
-## Estructura del proyecto
+## 🗂️ Estructura
 
 ```
-leadhunter-pro/
-├── scripts/        Módulos del motor (fuentes, enriquecimiento, scoring,
-│                   outreach, config, suppression, leads_db, _common)
-├── mappings/       Mapeos de CNAE y provincias
-├── templates/      Plantillas de email y HTML
-├── docs/           Documentación de cumplimiento y entregabilidad
-├── tests/          Suite de pruebas de humo (unittest)
-├── gui/            Interfaz gráfica Tkinter
-├── main.py         Punto de entrada CLI
-├── leadhunter.spec Spec de PyInstaller
-└── .env.example    Plantilla de configuración
+proyectos/leadhunter-pro/
+├── scripts/        Adapters Python (BORME, OSM, AEPD…), scoring, dedup
+├── api/            FastAPI thin layer · /discover /analyze /privacy /health
+├── web/            Next.js 16 (App Router, TS strict, Tailwind v4, shadcn)
+│   ├── src/app/
+│   │   ├── (auth)/login        Magic link Supabase
+│   │   ├── (app)/discover      Búsqueda de leads
+│   │   ├── (app)/analizar      Análisis profundo + assertion-mismatch
+│   │   ├── (app)/leads         Tabla persistida con filtros
+│   │   ├── (app)/outreach      Cola + plantillas + preview
+│   │   ├── (app)/config        SMTP · WA · Suppression · Equipo · Privacidad
+│   │   └── auth/callback       Callback magic link
+├── supabase/       Migraciones SQL aplicadas al proyecto globalizame-cazador
+├── gui/            Tkinter (legacy / herramienta interna offline)
+├── tests/          unittest suite Python
+├── mappings/       CNAE + provincias
+├── docs/           CUMPLIMIENTO_LEGAL · ENTREGABILIDAD_EMAIL · runbook
+├── .specify/       Spec Kit · constitution + spec + plan + tasks
+└── ARCHITECTURE.md Arquitectura objetivo (long form)
 ```
 
-## Documentación
+---
 
-- [`docs/CUMPLIMIENTO_LEGAL.md`](docs/CUMPLIMIENTO_LEGAL.md) — RGPD, LSSI-CE,
-  plantillas de ROPA y LIA, checklist legal previo al outreach.
-- [`docs/ENTREGABILIDAD_EMAIL.md`](docs/ENTREGABILIDAD_EMAIL.md) — configuración
-  de SPF, DKIM, DMARC, calendario de warm-up y límites de envío.
+## 🆘 Algo ha petado
 
-## Privacidad y seguridad
+Mira [`docs/runbook.md`](docs/runbook.md) primero. Cubre los flujos
+más comunes (build falla, API no responde, login no llega, mismatch
+de schema Supabase, fuentes caídas).
 
-- Las credenciales SMTP viven solo en `.env` (no versionado, no en JSON).
-- Toda la información (leads, supresiones, envíos) se guarda **en local**, en
-  bases SQLite bajo `~/.cache/leadhunter-pro/`.
-- La lista de supresión se comprueba **antes de cada envío**.
-- Cada email incluye un mecanismo de baja (`List-Unsubscribe` + "responde BAJA").
+---
+
+## 📚 Más
+
+- [`CHANGELOG.md`](CHANGELOG.md) — qué se hizo en cada release.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — visión técnica completa.
+- [`.specify/memory/constitution.md`](.specify/memory/constitution.md) —
+  principios y reglas no negociables del proyecto.
+- [`docs/CUMPLIMIENTO_LEGAL.md`](docs/CUMPLIMIENTO_LEGAL.md) — checklist
+  legal antes de cualquier campaña.
+- [`docs/ENTREGABILIDAD_EMAIL.md`](docs/ENTREGABILIDAD_EMAIL.md) — SPF /
+  DKIM / DMARC + calendario de warm-up.
