@@ -86,27 +86,27 @@ Sin estos 5, Sprint 0 no arranca. Son todos one-off, externos al repo.
 
 ### 3.A · Scaffold
 
-- [ ] **[T050][CL]** Crear `api/pyproject.toml` con FastAPI, uvicorn, pydantic-settings, python-jose, supabase-py.
-- [ ] **[T051][CL]** Crear `api/main.py` con `FastAPI()`, CORS, middleware de logging estructurado, OpenAPI tags.
-- [ ] **[T052][CL]** Crear `api/settings.py` con `pydantic_settings.BaseSettings` leyendo env vars.
-- [ ] **[T053][CL]** Crear `api/deps.py` con dependencia `get_current_user()` que valida JWT Supabase contra JWKS.
-- [ ] **[T054][CL]** Crear `api/db.py` con cliente Supabase compartido (`service_role` para escrituras backend).
+- [x] **[T050][CL]** Crear `api/pyproject.toml` con FastAPI, uvicorn, pydantic-settings, python-jose, supabase-py.
+- [x] **[T051][CL]** Crear `api/main.py` con `FastAPI()`, CORS, middleware de logging estructurado, OpenAPI tags.
+- [x] **[T052][CL]** Crear `api/settings.py` con `pydantic_settings.BaseSettings` leyendo env vars.
+- [x] **[T053][CL]** Crear `api/deps.py` con dependencia `get_current_user()` que valida JWT Supabase contra JWKS.
+- [x] **[T054][CL]** Crear `api/db.py` con cliente Supabase compartido (`service_role` para escrituras backend).
 
 ### 3.B · Schemas y rutas
 
-- [ ] **[T055][CL]** `api/schemas/common.py` — `Lead`, `SourceStatus`, `SchemaVersion = "2.0.0"`.
-- [ ] **[T056][CL]** `api/schemas/discover.py` — request/response del endpoint.
-- [ ] **[T057][CL]** `api/schemas/analyze.py` — request/response.
-- [ ] **[T058][CL]** `api/routes/discover.py` — `POST /discover`, llama a `scripts.discover.discover()`.
-- [ ] **[T059][CL]** `api/routes/analyze.py` — `POST /analyze`, llama a `scripts.analyze.analyze()`.
-- [ ] **[T060][CL]** `api/routes/health.py` — `GET /health` y `GET /health/sources`.
-- [ ] **[T061][CL]** `api/tests/test_health.py` y `test_auth.py` (401 sin token, 200 con token válido mockeado).
+- [x] **[T055][CL]** `api/schemas/common.py` — `Lead`, `SourceStatus`, `SchemaVersion = "2.0.0"`.
+- [x] **[T056][CL]** `api/schemas/discover.py` — request/response del endpoint.
+- [x] **[T057][CL]** `api/schemas/analyze.py` — request/response.
+- [x] **[T058][CL]** `api/routes/discover.py` — `POST /discover`, llama a `scripts.discover.discover()`.
+- [x] **[T059][CL]** `api/routes/analyze.py` — `POST /analyze`, llama a `scripts.analyze.analyze()`.
+- [x] **[T060][CL]** `api/routes/health.py` — `GET /health` y `GET /health/sources`.
+- [x] **[T061][CL]** `api/tests/test_health.py` y `test_auth.py` (401 sin token, 200 con token válido mockeado).
 
 ### 3.C · Deploy
 
-- [ ] **[T062][CL]** Crear `api/Dockerfile` multi-stage: Python 3.12 slim + `playwright install chromium` + `scripts/` montado como módulo importable.
-- [ ] **[T063][CL]** Crear `api/.dockerignore` para excluir `__pycache__`, `tests/`, `.venv`.
-- [ ] **[T064][OP]** Crear proyecto GCP `globalizame-cazador`, habilitar Cloud Run y Cloud Build.
+- [x] **[T062][CL]** Crear `api/Dockerfile` multi-stage: Python 3.12 slim + `playwright install chromium` + `scripts/` montado como módulo importable.
+- [x] **[T063][CL]** Crear `api/.dockerignore` para excluir `__pycache__`, `tests/`, `.venv`.
+- [x] **[T064][OP]** Crear proyecto GCP `globalizame-cazador`, habilitar Cloud Run y Cloud Build.
 - [ ] **[T065][CL]** Deploy inicial con `gcloud run deploy api --source api/ --region europe-west1 --allow-unauthenticated=false`.
 - [ ] **[T066][CL]** Configurar las env vars del runtime en Cloud Run (Supabase URL/key, Gemini key) vía `gcloud run services update`.
 - [ ] **[T067][CL]** Actualizar `.github/workflows/deploy.yml` para automatizar el deploy api en push a `main`.
