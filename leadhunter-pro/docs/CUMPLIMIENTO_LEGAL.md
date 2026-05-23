@@ -1,11 +1,11 @@
-# Cumplimiento legal — LeadHunter Pro
+# Cumplimiento legal — Cazador Globalizame
 
 > **AVISO**: Este documento es una guía práctica de cumplimiento, no constituye
 > asesoramiento jurídico. Antes de lanzar campañas de prospección comercial,
 > revisa esta documentación con un profesional legal especializado en
 > protección de datos.
 
-LeadHunter Pro trata datos personales (emails, nombres de decisores, teléfonos)
+Cazador Globalizame trata datos personales (emails, nombres de decisores, teléfonos)
 de empresas y profesionales. En España esto está regulado, principalmente, por:
 
 - **RGPD** — Reglamento (UE) 2016/679 General de Protección de Datos.
@@ -194,7 +194,7 @@ Antes de lanzar **cualquier** campaña, verifica:
 - [ ] La comunicación se **identifica como publicidad** de forma clara.
 - [ ] El **remitente está identificado** (nombre/razón social real).
 - [ ] Cada email incluye un **mecanismo de baja sencillo y gratuito**
-      (LeadHunter Pro: respuesta "BAJA" + cabecera `List-Unsubscribe`).
+      (Cazador Globalizame: respuesta "BAJA" + cabecera `List-Unsubscribe`).
 - [ ] Existe un **proceso para atender las bajas** sin demora
       (`outreach.process_unsubscribe_request()` -> lista de supresión).
 - [ ] La **lista de supresión** se comprueba **antes de cada envío**
@@ -211,7 +211,7 @@ Antes de lanzar **cualquier** campaña, verifica:
 
 ---
 
-## 5. Cómo LeadHunter Pro ayuda al cumplimiento
+## 5. Cómo Cazador Globalizame ayuda al cumplimiento
 
 | Obligación legal                         | Funcionalidad de la app                          |
 |------------------------------------------|--------------------------------------------------|

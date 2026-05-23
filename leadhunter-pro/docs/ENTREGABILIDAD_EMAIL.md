@@ -1,4 +1,4 @@
-# Entregabilidad de email — LeadHunter Pro
+# Entregabilidad de email — Cazador Globalizame
 
 Guía práctica para que los emails de prospección **lleguen a la bandeja de
 entrada** y no a spam. Una mala reputación de envío arruina cualquier campaña:
@@ -118,7 +118,7 @@ Buenas prácticas durante el warm-up:
 
 ## 6. Límites de envío recomendados
 
-LeadHunter Pro aplica límites por defecto en `send_outreach_batch()`:
+Cazador Globalizame aplica límites por defecto en `send_outreach_batch()`:
 
 - `min_seconds_between_sends = 45` — al menos 45 s entre envíos reales.
 - `daily_cap = 40` — máximo de envíos reales por día.
@@ -143,10 +143,10 @@ Para prospección en frío conviene quedarse **muy por debajo** de estos topes.
 ## 7. Higiene de la lista y contenido
 
 - **Verifica los emails** antes de enviar (evita rebotes que dañan la reputación).
-- LeadHunter Pro añade automáticamente los **hard bounces** a la lista de
+- Cazador Globalizame añade automáticamente los **hard bounces** a la lista de
   supresión (`mark_bounced()`), no vuelvas a enviarles.
 - Respeta siempre las **bajas** (lista de supresión, comprobada antes de enviar).
-- Incluye la cabecera `List-Unsubscribe` (LeadHunter Pro la añade en cada email).
+- Incluye la cabecera `List-Unsubscribe` (Cazador Globalizame la añade en cada email).
 - Evita en el asunto y el cuerpo: MAYÚSCULAS excesivas, "GRATIS", "!!!",
   exceso de enlaces, imágenes pesadas sin texto.
 - Mantén una **relación texto/HTML** equilibrada; el texto plano ayuda.

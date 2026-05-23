@@ -1,4 +1,4 @@
-# LeadHunter Pro
+# Cazador Globalizame
 
 Motor de generación de leads B2B para el mercado español. Descubre empresas por
 sector y provincia, las enriquece con datos de fuentes públicas (BORME, PLACSP,

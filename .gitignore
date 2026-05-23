@@ -3,7 +3,12 @@ __pycache__/
 *.egg-info/
 .env
 *.env
+.env.*
+**/.env
+**/.env.*
 !.env.example
+!**/.env.example
+!**/.env.local.example
 .venv/
 venv/
 build/
@@ -15,3 +20,17 @@ dist/
 *.log
 leadhunter.log
 .DS_Store
+
+# Bandejas de credenciales del operador (NUNCA commitear)
+info
+info.*
+**/info
+**/info.*
+secrets/
+*.secrets
+
+# Builds Next.js / Node
+**/node_modules/
+**/.next/
+**/.turbo/
+**/.vercel/

@@ -1,0 +1,300 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ──────────────────────────────────────────────────────────────────
+   LeadHunter Pro · marca Globalizame
+   Verde #86CA28 · Púrpura #700962 · Negro #0A0A0A · Naranja #FFA500
+   Títulos: Josefin Sans · Cuerpo: Inter
+   ────────────────────────────────────────────────────────────────── */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-josefin);
+  --font-mono: var(--font-geist-mono);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand-green: #86ca28;
+  --color-brand-purple: #700962;
+  --color-brand-black: #0a0a0a;
+  --color-brand-white: #ffffff;
+  --color-brand-orange: #ffa500;
+
+  --color-chart-1: #86ca28;
+  --color-chart-2: #700962;
+  --color-chart-3: #ffa500;
+  --color-chart-4: #4ade80;
+  --color-chart-5: #a855f7;
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+}
+
+/* Light mode existe pero por defecto la app va en oscuro (filosofía
+   Globalizame: contraste y foco). */
+:root {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+
+  --primary: #86ca28;
+  --primary-foreground: #0a0a0a;
+  --secondary: #700962;
+  --secondary-foreground: #ffffff;
+  --muted: #f5f5f5;
+  --muted-foreground: #525252;
+  --accent: #700962;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --warning: #ffa500;
+
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #86ca28;
+
+  --radius: 0.625rem;
+
+  --sidebar: #fafafa;
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: #86ca28;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #f5f5f5;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #86ca28;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #141414;
+  --card-foreground: #fafafa;
+  --popover: #141414;
+  --popover-foreground: #fafafa;
+
+  --primary: #86ca28;
+  --primary-foreground: #0a0a0a;
+  --secondary: #700962;
+  --secondary-foreground: #fafafa;
+  --muted: #1f1f1f;
+  --muted-foreground: #a3a3a3;
+  --accent: #700962;
+  --accent-foreground: #fafafa;
+  --destructive: #ef4444;
+  --warning: #ffa500;
+
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: #86ca28;
+
+  --sidebar: #0f0f0f;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #86ca28;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #1f1f1f;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: #86ca28;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
+  /* Numerales tabulares uniformes para tablas y métricas: alinea verticalmente
+     dígitos sin saltos de ancho. */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Decoración: grain + scanlines + bloom
+   Filosofía: operador, no SaaS. Textura sutil que no se vea hasta que
+   pones atención. Ninguna decoración debe estorbar a la lectura.
+   ────────────────────────────────────────────────────────────────── */
+
+@layer utilities {
+  /* Grano fino procedural sobre paneles oscuros */
+  .grain-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.35 0'/></filter><rect width='200' height='200' filter='url(%23n)' opacity='0.55'/></svg>");
+    opacity: 0.06;
+    mix-blend-mode: overlay;
+    z-index: 1;
+  }
+
+  /* Patrón de cuadrícula tipo terminal (líneas hairline) para fondos
+     decorativos de panel-hero. */
+  .grid-pattern {
+    background-image:
+      linear-gradient(to right, color-mix(in oklch, var(--foreground) 4%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 4%, transparent) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* Bloom verde para indicadores de estado "live" */
+  .dot-bloom {
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--primary) 30%, transparent),
+      0 0 12px color-mix(in oklch, var(--primary) 60%, transparent),
+      0 0 24px color-mix(in oklch, var(--primary) 25%, transparent);
+  }
+  .dot-bloom-orange {
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--warning) 30%, transparent),
+      0 0 10px color-mix(in oklch, var(--warning) 55%, transparent);
+  }
+
+  /* Barra de escaneo del CTA primario: una franja oblicua que cruza el
+     botón cada cierto tiempo. Se activa con .scanline en estado idle. */
+  .scanline-cta {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .scanline-cta::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      color-mix(in oklch, #ffffff 35%, transparent) 50%,
+      transparent 70%
+    );
+    transform: translateX(-130%);
+    animation: cta-shimmer 3.4s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+  }
+  @keyframes cta-shimmer {
+    0%, 60% { transform: translateX(-130%); }
+    80%, 100% { transform: translateX(130%); }
+  }
+
+  /* Linea izquierda animada para hover de fila de tabla */
+  .row-accent {
+    box-shadow: inset 3px 0 0 0 transparent;
+    transition: box-shadow 120ms ease;
+  }
+  .row-accent[data-hovered="true"],
+  .row-accent:hover {
+    box-shadow: inset 3px 0 0 0 var(--primary);
+  }
+
+  /* Tarjeta hero con halo púrpura suave */
+  .hero-glow {
+    position: relative;
+  }
+  .hero-glow::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--secondary) 60%, transparent),
+      transparent 35%,
+      transparent 65%,
+      color-mix(in oklch, var(--primary) 50%, transparent)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* Texto en mayúsculas con tracking ministerial */
+  .label-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+
+  /* Numeral display gigante (counter del slider) */
+  .numeral-display {
+    font-family: var(--font-heading);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    line-height: 0.85;
+  }
+
+  /* Fade-in con stagger para resultados */
+  @keyframes row-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .row-in {
+    animation: row-in 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  /* Barra de progreso del CTA en loading */
+  @keyframes scan-progress {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  .scan-progress {
+    animation: scan-progress 1.4s linear infinite;
+  }
+}
