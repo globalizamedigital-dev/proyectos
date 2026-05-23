@@ -175,10 +175,10 @@ Sin estos 5, Sprint 0 no arranca. Son todos one-off, externos al repo.
 
 ## Fase 7 · Sprint 6 · Privacy + compliance
 
-- [ ] **[T120][CL]** `api/routes/privacy.py` — `POST /privacy/export` devuelve JSON con todos los datos del sujeto.
-- [ ] **[T121][CL]** `api/routes/privacy.py` — `DELETE /privacy/erase` borra leads + outreach_events + embeddings.
-- [ ] **[T122][CL]** `web/src/app/(app)/config/_components/privacy-panel.tsx` — botones Export GDPR / Erase, input para email/NIF.
-- [ ] **[T123][CL]** Plantillas email cold incluyen link a `/unsubscribe?token` por defecto; render falla si falta.
+- [x] **[T120][CL]** `api/routes/privacy.py` — `POST /privacy/export` devuelve JSON con todos los datos del sujeto.
+- [x] **[T121][CL]** `api/routes/privacy.py` — `DELETE /privacy/erase` borra leads + outreach_events + embeddings.
+- [x] **[T122][CL]** `web/src/app/(app)/config/_components/privacy-panel.tsx` — botones Export GDPR / Erase, input para email/NIF.
+- [x] **[T123][CL]** Plantillas email cold incluyen link a `/unsubscribe?token` por defecto; render falla si falta.
 - [ ] **[T124][CL]** Test E2E: lead → outreach event → export → erase → consulta posterior devuelve 0 filas.
 
 ---

@@ -1,20 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, MessageCircle, ShieldOff, Users } from "lucide-react";
+import { FileWarning, Mail, MessageCircle, ShieldOff, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmtpForm } from "./smtp-form";
 import { WhatsappForm } from "./whatsapp-form";
 import { SuppressionList } from "./suppression-list";
 import { TeamMembers } from "./team-members";
+import { PrivacyPanel } from "./privacy-panel";
 
-type Tab = "smtp" | "whatsapp" | "suppression" | "team";
+type Tab = "smtp" | "whatsapp" | "suppression" | "team" | "privacy";
 
 const TABS: { id: Tab; label: string; icon: typeof Mail }[] = [
   { id: "smtp", label: "SMTP", icon: Mail },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { id: "suppression", label: "Suppression", icon: ShieldOff },
   { id: "team", label: "Equipo", icon: Users },
+  { id: "privacy", label: "Privacidad", icon: FileWarning },
 ];
 
 export function ConfigClient() {
@@ -65,6 +67,7 @@ export function ConfigClient() {
         {tab === "whatsapp" && <WhatsappForm />}
         {tab === "suppression" && <SuppressionList />}
         {tab === "team" && <TeamMembers />}
+        {tab === "privacy" && <PrivacyPanel />}
       </div>
     </div>
   );

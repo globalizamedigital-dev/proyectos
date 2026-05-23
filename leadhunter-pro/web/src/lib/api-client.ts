@@ -35,10 +35,12 @@ interface RequestOpts {
   auth?: boolean;
 }
 
+type HttpMethod = "GET" | "POST" | "DELETE";
+
 async function request<T>(
   path: string,
   body: unknown,
-  { signal, auth = true }: RequestOpts = {}
+  { signal, auth = true, method }: RequestOpts & { method?: HttpMethod } = {}
 ): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -54,10 +56,13 @@ async function request<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
+  const finalMethod: HttpMethod =
+    method ?? (body === undefined ? "GET" : "POST");
+
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
-      method: body === undefined ? "GET" : "POST",
+      method: finalMethod,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
@@ -138,6 +143,11 @@ export interface SourceState {
   detail?: string;
 }
 
+export interface PrivacySubject {
+  kind: "email" | "phone" | "nif";
+  value: string;
+}
+
 export const apiClient = {
   discover(req: DiscoverRequest, signal?: AbortSignal): Promise<DiscoverResponse> {
     return request<DiscoverResponse>("/discover", req, { signal });
@@ -154,5 +164,13 @@ export const apiClient = {
   },
   sources(signal?: AbortSignal) {
     return request<SourceState[]>("/health/sources", undefined, { signal, auth: false });
+  },
+  /** Genérico — wrap fino para endpoints menos comunes (privacy). */
+  request<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return request<T>(path, body);
+  },
+  /** DELETE con cuerpo JSON — para /privacy/erase. */
+  requestDelete<T = unknown>(path: string, body: unknown): Promise<T> {
+    return request<T>(path, body, { method: "DELETE" });
   },
 };

@@ -23,7 +23,14 @@ def _build_client(url: str, key: str) -> Client:
     return create_client(url, key)
 
 
-def get_supabase(settings: Settings | None = None) -> Client:
-    """Devuelve un cliente Supabase service_role. Singleton."""
-    s = settings or get_settings()
+def get_supabase() -> Client:
+    """
+    Devuelve un cliente Supabase service_role. Singleton.
+
+    Sin parámetros a propósito: si la firma incluyese `settings: Settings`,
+    FastAPI inspeccionaría ese sub-parámetro al usar la función como
+    dependency y trataría Settings (que extiende BaseModel) como un
+    embed body, lo que rompe el parseo del body real de la ruta.
+    """
+    s = get_settings()
     return _build_client(s.supabase_url, s.supabase_service_role_key)

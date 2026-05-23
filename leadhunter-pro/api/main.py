@@ -30,7 +30,7 @@ sys.path.insert(0, str(_API_DIR))
 sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from logging_config import configure_logging  # noqa: E402
-from routes import analyze, discover, health  # noqa: E402
+from routes import analyze, discover, health, privacy  # noqa: E402
 from settings import get_settings  # noqa: E402
 
 _settings = get_settings()
@@ -93,6 +93,7 @@ async def trace_and_log(request: Request, call_next):
 app.include_router(health.router)
 app.include_router(discover.router)
 app.include_router(analyze.router)
+app.include_router(privacy.router)
 
 
 @app.get("/", include_in_schema=False)
