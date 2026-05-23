@@ -130,32 +130,32 @@ Sin estos 5, Sprint 0 no arranca. Son todos one-off, externos al repo.
 
 ### 5.A · Analizar
 
-- [ ] **[T080][CL]** `web/src/app/(app)/analizar/page.tsx` — server component shell.
-- [ ] **[T081][CL]** `web/src/app/(app)/analizar/_components/analyze-form.tsx` — input NIF o razón social + opción premium (placeholder).
-- [ ] **[T082][CL]** `web/src/app/(app)/analizar/_components/ficha.tsx` — render con secciones (registralTimeline, decisores, web, compliance, sector público, subvenciones).
-- [ ] **[T083][CL]** `web/src/app/(app)/analizar/_components/assertion-banner.tsx` — banner naranja cuando hay `assertion_mismatch`.
+- [x] **[T080][CL]** `web/src/app/(app)/analizar/page.tsx` — server component shell.
+- [x] **[T081][CL]** `web/src/app/(app)/analizar/_components/analyze-form.tsx` — input NIF o razón social + opción premium (placeholder).
+- [x] **[T082][CL]** `web/src/app/(app)/analizar/_components/ficha.tsx` — render con secciones (registralTimeline, decisores, web, compliance, sector público, subvenciones).
+- [x] **[T083][CL]** `web/src/app/(app)/analizar/_components/assertion-banner.tsx` — banner naranja cuando hay `assertion_mismatch`.
 
 ### 5.B · Leads (tabla persistida)
 
-- [ ] **[T084][CL]** `web/src/app/(app)/leads/page.tsx` — server component que pre-carga la primera página desde Supabase.
-- [ ] **[T085][CL]** `web/src/app/(app)/leads/_components/leads-table.tsx` — `@tanstack/react-table` con virtualización, sort y paginación.
-- [ ] **[T086][CL]** `web/src/app/(app)/leads/_components/filters-bar.tsx` — provincia, sector, score≥X, status.
-- [ ] **[T087][CL]** `web/src/app/(app)/leads/_components/bulk-actions.tsx` — multi-select + "Añadir a Outreach".
+- [x] **[T084][CL]** `web/src/app/(app)/leads/page.tsx` — server component que pre-carga la primera página desde Supabase.
+- [x] **[T085][CL]** `web/src/app/(app)/leads/_components/leads-table.tsx` — `@tanstack/react-table` con virtualización, sort y paginación.
+- [x] **[T086][CL]** `web/src/app/(app)/leads/_components/filters-bar.tsx` — provincia, sector, score≥X, status.
+- [x] **[T087][CL]** `web/src/app/(app)/leads/_components/bulk-actions.tsx` — multi-select + "Añadir a Outreach".
 
 ### 5.C · Outreach
 
-- [ ] **[T088][CL]** `web/src/app/(app)/outreach/page.tsx` — server shell.
-- [ ] **[T089][CL]** `web/src/app/(app)/outreach/_components/queue.tsx` — leads en cola con avatar/empresa/email.
-- [ ] **[T090][CL]** `web/src/app/(app)/outreach/_components/template-picker.tsx` — selector + preview del template renderizado.
-- [ ] **[T091][CL]** `web/src/app/(app)/outreach/_components/send-modal.tsx` — confirmación con resumen "vas a enviar a N · {emails preview}".
+- [x] **[T088][CL]** `web/src/app/(app)/outreach/page.tsx` — server shell.
+- [x] **[T089][CL]** `web/src/app/(app)/outreach/_components/queue.tsx` — leads en cola con avatar/empresa/email.
+- [x] **[T090][CL]** `web/src/app/(app)/outreach/_components/template-picker.tsx` — selector + preview del template renderizado.
+- [x] **[T091][CL]** `web/src/app/(app)/outreach/_components/send-modal.tsx` — confirmación con resumen "vas a enviar a N · {emails preview}".
 
 ### 5.D · Config
 
-- [ ] **[T092][CL]** `web/src/app/(app)/config/page.tsx` — layout con tabs SMTP · WhatsApp · Suppression · Equipo · Privacidad.
-- [ ] **[T093][CL]** `web/src/app/(app)/config/_components/smtp-form.tsx` — input host/port/user/pass + botón "Probar SMTP".
-- [ ] **[T094][CL]** `web/src/app/(app)/config/_components/whatsapp-form.tsx` — phone-number-id, access token, verify token, webhook URL (copiable).
-- [ ] **[T095][CL]** `web/src/app/(app)/config/_components/suppression-list.tsx` — tabla + botón "añadir manual" + import CSV.
-- [ ] **[T096][CL]** `web/src/app/(app)/config/_components/team-members.tsx` — invitar email / cambiar rol / eliminar.
+- [x] **[T092][CL]** `web/src/app/(app)/config/page.tsx` — layout con tabs SMTP · WhatsApp · Suppression · Equipo · Privacidad.
+- [x] **[T093][CL]** `web/src/app/(app)/config/_components/smtp-form.tsx` — input host/port/user/pass + botón "Probar SMTP".
+- [x] **[T094][CL]** `web/src/app/(app)/config/_components/whatsapp-form.tsx` — phone-number-id, access token, verify token, webhook URL (copiable).
+- [x] **[T095][CL]** `web/src/app/(app)/config/_components/suppression-list.tsx` — tabla + botón "añadir manual" + import CSV.
+- [x] **[T096][CL]** `web/src/app/(app)/config/_components/team-members.tsx` — invitar email / cambiar rol / eliminar.
 
 ---
 
