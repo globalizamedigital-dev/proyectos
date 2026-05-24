@@ -6,7 +6,6 @@ import {
   Compass,
   Microscope,
   Database,
-  Send,
   SlidersHorizontal,
 } from "lucide-react";
 import {
@@ -24,12 +23,14 @@ interface NavItem {
   shortcut: string;
 }
 
+// Cazador MVP: solo descubrir + cualificar + persistir. Outreach (email,
+// WhatsApp) queda fuera del MVP. Si vuelve al producto, se reañade Outreach
+// como item 04 entre Leads y Config.
 const NAV: readonly NavItem[] = [
   { label: "Discover", href: "/discover", icon: Compass, shortcut: "01" },
   { label: "Analizar", href: "/analizar", icon: Microscope, shortcut: "02" },
   { label: "Leads", href: "/leads", icon: Database, shortcut: "03" },
-  { label: "Outreach", href: "/outreach", icon: Send, shortcut: "04" },
-  { label: "Config", href: "/config", icon: SlidersHorizontal, shortcut: "05" },
+  { label: "Config", href: "/config", icon: SlidersHorizontal, shortcut: "04" },
 ];
 
 export function Sidebar() {

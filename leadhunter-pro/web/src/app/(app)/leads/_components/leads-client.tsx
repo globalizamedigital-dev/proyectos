@@ -7,7 +7,6 @@ import {
   ArrowUpDown,
   Database,
   Download,
-  Send,
   ServerCrash,
 } from "lucide-react";
 import {
@@ -20,7 +19,6 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -46,7 +44,6 @@ export interface LeadRow {
   domain: string | null;
   provincia: string | null;
   sector: string | null;
-  outreach_status: string;
   sources_hit: string[] | null;
   last_seen: string;
 }
@@ -125,11 +122,6 @@ const COLUMNS: ColumnDef<LeadRow>[] = [
       ) : (
         <Dash />
       ),
-  },
-  {
-    accessorKey: "outreach_status",
-    header: "Estado",
-    cell: ({ row }) => <StatusBadge status={row.original.outreach_status} />,
   },
 ];
 
@@ -284,14 +276,7 @@ export function LeadsClient({ initialLeads, initialError }: Props) {
             className="h-9 rounded-none border-border/80 bg-transparent text-[11px] uppercase tracking-wider"
           >
             <Download className="mr-1.5 h-3.5 w-3.5" />
-            Exportar {selected.size > 0 ? `(${selected.size})` : ""}
-          </Button>
-          <Button
-            disabled={selected.size === 0}
-            className="h-9 rounded-none bg-primary text-[11px] uppercase tracking-wider disabled:bg-primary/40"
-          >
-            <Send className="mr-1.5 h-3.5 w-3.5" />
-            A outreach{selected.size > 0 ? ` (${selected.size})` : ""}
+            Exportar CSV {selected.size > 0 ? `(${selected.size})` : ""}
           </Button>
         </div>
       </div>
@@ -407,29 +392,6 @@ function FieldLabel({ index, label }: { index: string; label: string }) {
       <span className="label-eyebrow text-primary/80 tabular-nums">{index}</span>
       <span className="label-eyebrow">{label}</span>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    new: "bg-primary/[0.1] text-primary border-primary/40",
-    queued: "bg-secondary/[0.1] text-secondary border-secondary/40",
-    sent: "bg-foreground/[0.08] text-foreground/80 border-border",
-    replied: "bg-primary/[0.15] text-primary border-primary",
-    bounced: "bg-destructive/[0.1] text-destructive border-destructive/40",
-    unsubscribed: "bg-muted text-muted-foreground border-border",
-    do_not_contact: "bg-destructive/[0.15] text-destructive border-destructive/50",
-  };
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        "rounded-none border bg-transparent px-1.5 py-0 font-mono text-[10px] uppercase tracking-wider",
-        map[status] || "border-border text-muted-foreground",
-      )}
-    >
-      {status}
-    </Badge>
   );
 }
 

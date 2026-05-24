@@ -15,7 +15,7 @@ export default async function LeadsPage() {
   const { data, error } = await sb
     .from("leads")
     .select(
-      "id, razon_social, nif, score, grade, decisor, decisor_role, email_principal, telefono, domain, provincia, sector, outreach_status, sources_hit, last_seen",
+      "id, razon_social, nif, score, grade, decisor, decisor_role, email_principal, telefono, domain, provincia, sector, sources_hit, last_seen",
     )
     .order("score", { ascending: false })
     .limit(200);

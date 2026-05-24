@@ -401,17 +401,22 @@ upgrade opcional cuando un cliente lo pague:**
 - **SaaS público / self-service signup / Stripe checkout / pricing
   page** — Cazador es herramienta interna; si en el futuro se abre,
   se reabre la spec.
+- **Outreach automatizado (email + WhatsApp) — recortado del MVP
+  2026-05-24.** El MVP se queda en descubrir → cualificar → persistir
+  → exportar. Los FR del bloque G (`outreach`) y la persona B
+  (Comercial de Globalizame) quedan como referencia histórica pero
+  no se implementan. Si vuelven, se actualiza la spec entera.
+  El operador exporta el CSV de leads y hace el outreach por sus
+  canales habituales (CRM, n8n existente, herramienta externa).
 
 ---
 
 ## 6 · Open questions (decisiones pendientes del operador)
 
-1. ¿Qué SMTP usa Globalizame para el outreach? Hostinger del dominio
-   `globalizame.com`, Gmail con App Password, o Zoho free.
-2. ¿Service account de Vertex AI regenerada? La SA actual
+1. ¿Service account de Vertex AI regenerada? La SA actual
    (`globalizame@globalizame-apis-493012.iam.gserviceaccount.com`)
    devuelve "Invalid JWT Signature"; pendiente rotar la key en consola
-   GCP IAM.
+   GCP IAM. **Único bloqueante real** para Sprint 7 (Gemini scoring).
 
 ---
 

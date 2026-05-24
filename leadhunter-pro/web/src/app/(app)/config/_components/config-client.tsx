@@ -1,26 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { FileWarning, Mail, MessageCircle, ShieldOff, Users } from "lucide-react";
+import { FileWarning, ShieldOff, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SmtpForm } from "./smtp-form";
-import { WhatsappForm } from "./whatsapp-form";
 import { SuppressionList } from "./suppression-list";
 import { TeamMembers } from "./team-members";
 import { PrivacyPanel } from "./privacy-panel";
 
-type Tab = "smtp" | "whatsapp" | "suppression" | "team" | "privacy";
+// MVP sin canales de envío (email/WhatsApp): los tabs SMTP y WhatsApp
+// quedan fuera. Si se reintroduce outreach, se reañaden.
+type Tab = "suppression" | "team" | "privacy";
 
-const TABS: { id: Tab; label: string; icon: typeof Mail }[] = [
-  { id: "smtp", label: "SMTP", icon: Mail },
-  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+const TABS: { id: Tab; label: string; icon: typeof ShieldOff }[] = [
   { id: "suppression", label: "Suppression", icon: ShieldOff },
   { id: "team", label: "Equipo", icon: Users },
   { id: "privacy", label: "Privacidad", icon: FileWarning },
 ];
 
 export function ConfigClient() {
-  const [tab, setTab] = useState<Tab>("smtp");
+  const [tab, setTab] = useState<Tab>("suppression");
 
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-6 px-6 py-8 lg:px-10 lg:py-10">
@@ -63,8 +61,6 @@ export function ConfigClient() {
 
       {/* Tab content */}
       <div className="border border-border/60 bg-card">
-        {tab === "smtp" && <SmtpForm />}
-        {tab === "whatsapp" && <WhatsappForm />}
         {tab === "suppression" && <SuppressionList />}
         {tab === "team" && <TeamMembers />}
         {tab === "privacy" && <PrivacyPanel />}

@@ -1,12 +1,18 @@
 # Cazador Globalizame
 
-> Herramienta interna de Globalizame para generar leads B2B cualificados
-> a partir de fuentes oficiales españolas (BORME, OSM, Cartociudad,
-> PLACSP, AEPD, INE/DIRCE, Infosubvenciones).
+> Herramienta interna de Globalizame para **descubrir y cualificar
+> leads B2B** a partir de fuentes oficiales españolas (BORME, OSM,
+> Cartociudad, PLACSP, AEPD, INE/DIRCE, Infosubvenciones).
 >
 > **No es SaaS público. No hay cobros dentro de la app.** Lo usa el
 > equipo de Globalizame para sus propios leads y para los clientes del
-> Servicio Integral (cobro vía factura clásica, no Stripe).
+> Servicio Integral.
+>
+> **MVP recortado (2026-05-24): Cazador NO hace outreach automatizado.**
+> Solo descubre, cualifica, persiste y exporta. El contacto con los
+> leads se hace en los canales existentes de Globalizame (CRM, n8n,
+> herramientas externas). El schema Supabase mantiene las tablas
+> `outreach_*` por si vuelve, pero hoy no se usan desde la web.
 
 ---
 

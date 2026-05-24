@@ -5,6 +5,52 @@ con la misma cadena (`v0.2.0-mvp`, `v0.3.0`, …).
 
 ---
 
+## [0.2.1-mvp] — 2026-05-24 · scope-cut: solo descubrir leads
+
+Decisión del operador: Cazador se queda en **descubrir + cualificar +
+exportar**, sin outreach automatizado. Mario hará el contacto por sus
+canales actuales (CRM, n8n existente).
+
+### Eliminado del UI
+
+- Pestaña **Outreach** del sidebar (5 → 4 items).
+- Ruta `/outreach` y sus 2 componentes (`outreach-client.tsx`,
+  `outreach/page.tsx`) borrados del filesystem.
+- Tabs **SMTP** y **WhatsApp** del `/config` borrados.
+- Componentes `smtp-form.tsx` y `whatsapp-form.tsx` borrados.
+- Bulk action "A outreach" de `/leads` borrada. Solo queda "Exportar CSV".
+- Filtro y columna `outreach_status` de la tabla de leads.
+
+### Lo que sigue (no se toca)
+
+- Schema Supabase: las tablas `outreach_templates`, `outreach_sequences`,
+  `outreach_events` y `suppression` siguen en el schema. Si vuelve el
+  outreach, no hay que migrar.
+- Endpoints API: `/privacy/export`, `/privacy/erase`, `/unsubscribe`
+  siguen. Suppression list sigue siendo obligatorio por GDPR.
+- Tab **Suppression** en `/config`: sigue, ahora más relevante (gestión
+  manual desde aquí).
+- GUI Tkinter legacy: el módulo Python `scripts/outreach.py` sigue ahí
+  para uso offline standalone, ya no acoplado al frontend web.
+- Sprint 5 del spec/plan/tasks queda marcado como `~~descartada~~` con
+  fecha. Si se reactiva, se reabre el bloque entero.
+
+### Bloqueantes externos eliminados
+
+- ~~SMTP del tenant Globalizame~~ — ya no hace falta para el MVP.
+- ~~Meta WhatsApp Business System Token~~ — ya no hace falta.
+- **Único pendiente del operador**: rotar la SA Gemini en GCP IAM para
+  desbloquear Sprint 7 (scoring + entity resolution).
+
+### Verificación
+
+- Web build verde · **7 rutas** (`/`, `/login`, `/discover`, `/analizar`,
+  `/leads`, `/config`, `/auth/callback`).
+- Python `unittest discover`: 62/62 OK.
+- API pytest: 14/14 OK (privacy + health + auth + discover/analyze).
+
+---
+
 ## [0.2.0-mvp] — 2026-05-23
 
 Primer MVP web SaaS interno end-to-end. App entera navegable en local

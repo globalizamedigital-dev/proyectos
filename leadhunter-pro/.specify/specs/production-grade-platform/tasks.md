@@ -161,15 +161,15 @@ Sin estos 5, Sprint 0 no arranca. Son todos one-off, externos al repo.
 
 ## Fase 6 · Sprint 5 · Outreach + n8n
 
-- [ ] **[T100][CL]** `api/routes/outreach.py` — `POST /outreach/send` que valida suppression, renderiza template y dispara webhook n8n.
-- [ ] **[T101][CL]** `scripts/whatsapp_client.py` — wrapper de Meta WhatsApp Cloud API directa (send_text, send_template).
-- [ ] **[T102][CL]** Actualizar `scripts/outreach.py` para aceptar canal `email|whatsapp`.
-- [ ] **[T103][OP]** Crear workflow n8n `outreach-sequence` en `n8n.globalizame.cloud`: Webhook → switch canal → SMTP / WA → log a Supabase.
-- [ ] **[T104][CL]** Exportar el JSON del workflow a `n8n/outreach-sequence.json` para versionado.
-- [ ] **[T105][CL]** `api/routes/webhooks.py` — `POST /webhooks/bounce`, `POST /webhooks/reply`, `POST /webhooks/whatsapp-status`.
-- [ ] **[T106][CL]** `api/routes/privacy.py` — `GET /unsubscribe?token={signed}` que añade el email a suppression y renderiza una página HTML simple de confirmación.
-- [ ] **[T107][CL]** Validador SPF + DKIM en `scripts/smtp_config.py` que corre al guardar SMTP del tenant; warnings en UI si fallan.
-- [ ] **[T108][CL]** Test integración: añadir suppression → intentar enviar → debe registrar `skipped: suppressed` en `outreach_events`.
+- [~] **~~[T100]~~** (descartada · scope-cut MVP 2026-05-24, sin outreach)[CL]** `api/routes/outreach.py` — `POST /outreach/send` que valida suppression, renderiza template y dispara webhook n8n.
+- [~] **~~[T101]~~** (descartada · scope-cut MVP 2026-05-24, sin outreach)[CL]** `scripts/whatsapp_client.py` — wrapper de Meta WhatsApp Cloud API directa (send_text, send_template).
+- [~] **~~[T102]~~** (descartada · scope-cut MVP 2026-05-24, sin outreach)[CL]** Actualizar `scripts/outreach.py` para aceptar canal `email|whatsapp`.
+- [~] **~~[T103]~~** (descartada · scope-cut MVP 2026-05-24, sin outreach)[OP]** Crear workflow n8n `outreach-sequence` en `n8n.globalizame.cloud`: Webhook → switch canal → SMTP / WA → log a Supabase.
+- [~] **~~[T104]~~** (descartada · scope-cut MVP 2026-05-24, sin outreach)[CL]** Exportar el JSON del workflow a `n8n/outreach-sequence.json` para versionado.
+- [~] **~~[T105]~~** (descartada · scope-cut MVP 2026-05-24, sin outreach)[CL]** `api/routes/webhooks.py` — `POST /webhooks/bounce`, `POST /webhooks/reply`, `POST /webhooks/whatsapp-status`.
+- [~] **~~[T106]~~** (descartada · scope-cut MVP 2026-05-24, sin outreach)[CL]** `api/routes/privacy.py` — `GET /unsubscribe?token={signed}` que añade el email a suppression y renderiza una página HTML simple de confirmación.
+- [~] **~~[T107]~~** (descartada · scope-cut MVP 2026-05-24, sin outreach)[CL]** Validador SPF + DKIM en `scripts/smtp_config.py` que corre al guardar SMTP del tenant; warnings en UI si fallan.
+- [~] **~~[T108]~~** (descartada · scope-cut MVP 2026-05-24, sin outreach)[CL]** Test integración: añadir suppression → intentar enviar → debe registrar `skipped: suppressed` en `outreach_events`.
 
 ---
 
@@ -178,7 +178,7 @@ Sin estos 5, Sprint 0 no arranca. Son todos one-off, externos al repo.
 - [x] **[T120][CL]** `api/routes/privacy.py` — `POST /privacy/export` devuelve JSON con todos los datos del sujeto.
 - [x] **[T121][CL]** `api/routes/privacy.py` — `DELETE /privacy/erase` borra leads + outreach_events + embeddings.
 - [x] **[T122][CL]** `web/src/app/(app)/config/_components/privacy-panel.tsx` — botones Export GDPR / Erase, input para email/NIF.
-- [x] **[T123][CL]** Plantillas email cold incluyen link a `/unsubscribe?token` por defecto; render falla si falta.
+- [~] **~~[T123]~~** (descartada · scope-cut MVP 2026-05-24, sin outreach)[CL]** Plantillas email cold incluyen link a `/unsubscribe?token` por defecto; render falla si falta.
 - [ ] **[T124][CL]** Test E2E: lead → outreach event → export → erase → consulta posterior devuelve 0 filas.
 
 ---

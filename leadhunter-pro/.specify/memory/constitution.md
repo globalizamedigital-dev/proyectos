@@ -131,6 +131,13 @@
   Publicidad (gancho) → Auditoría GRATIS (urgencia) → Servicio Integral.
   Cazador es **el arma que usamos** para generar leads en ese embudo,
   no el embudo en sí.
+- **MVP recortado 2026-05-24: Cazador solo descubre y cualifica leads,
+  no los contacta.** El outreach (email/SMTP, WhatsApp) queda fuera del
+  MVP. El operador exporta los leads y los mete en sus canales actuales
+  (CRM Globalizame, n8n existente, herramienta externa). Si en el
+  futuro se reactiva el outreach interno, se reabre el bloque G del
+  spec entonces; las tablas Supabase `outreach_*` siguen en el schema
+  por higiene, sin uso.
 
 ---
 
