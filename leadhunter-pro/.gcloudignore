@@ -1,0 +1,54 @@
+# gcloud usa este archivo (no .dockerignore) para decidir QUÉ subir al
+# build context de Cloud Build. Es importante: excluye TODO lo que no
+# sea necesario para construir la imagen del API.
+
+# Mantenemos solo lo que el Dockerfile necesita: api/, scripts/,
+# requirements.txt, Dockerfile, .dockerignore.
+
+.git/
+.github/
+.gitignore
+.specify/
+*.md
+.env
+.env.*
+info
+info.*
+*.spec
+*.spec.bak
+.cache/
+.vscode/
+.idea/
+
+# Frontend Next.js entero
+web/
+
+# GUI Tkinter standalone — `/main.py` con barra inicial es el RAÍZ
+# only, no afecta a api/main.py.
+gui/
+/main.py
+leadhunter.spec
+
+# Docs y datos
+docs/
+mappings/
+templates/
+
+# Tests no van al contenedor
+tests/
+
+# Python builds
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+
+# Logs y dbs
+*.log
+*.sqlite
+*.db
